@@ -26,12 +26,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'npm'
 
-      - name: Install deps
+      - name: Install frontend deps
+        working-directory: frontend
         run: npm ci
 
-      - name: Next build
+      - name: Build Next.js frontend
+        working-directory: frontend
         run: npm run build
 
   deploy-prod:
