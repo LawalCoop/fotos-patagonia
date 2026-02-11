@@ -15,8 +15,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Next build
+        run: npm run build
+
   deploy-prod:
     runs-on: ubuntu-latest
+    needs: build   # 👈 SOLO deploya si build pasa
 
     steps:
       - name: Preparar SSH
