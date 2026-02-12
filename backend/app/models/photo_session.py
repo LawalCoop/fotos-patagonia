@@ -46,7 +46,7 @@ class PhotoSession(Base):
     photographer_id = Column(Integer, ForeignKey("photographers.id"))
     album_id = Column(Integer, ForeignKey("albums.id"), nullable=True)
 
-    photographer = relationship("Photographer")
+    photographer = relationship("Photographer", back_populates="photo_sessions")
     album = relationship("Album", back_populates="sessions")
     photos = relationship("Photo", back_populates="session")
 

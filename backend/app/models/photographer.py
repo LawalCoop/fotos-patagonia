@@ -39,4 +39,5 @@ class Photographer(Base):
 
     user = relationship("User", back_populates="photographer")
     photos = relationship("Photo", back_populates="photographer")
-    earnings = relationship("Earning", back_populates="photographer")
+    earnings = relationship("Earning", back_populates="photographer", passive_deletes=True)
+    photo_sessions = relationship("PhotoSession", back_populates="photographer")

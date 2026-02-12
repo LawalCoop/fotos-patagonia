@@ -77,6 +77,7 @@ class Photo(Base):
     description = Column(String(255))
     price = Column(Float, nullable=False)
     object_name = Column(Text, nullable=False)
+    content_hash = Column(String(256), unique=True, index=True, nullable=True)
     photographer_id = Column(Integer, ForeignKey("photographers.id"))
     session_id = Column(Integer, ForeignKey("photo_sessions.id"))
 

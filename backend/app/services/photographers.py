@@ -115,6 +115,21 @@ class PhotographerService(BaseService):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Photographer not found"
             )
+
+        # Check for associated photo sessions
+        if self.db.query(PhotoSession).filter(PhotoSession.photographer_id == ph_id).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete photographer: still has associated photo sessions."
+            )
+
+        # Check for associated earnings
+        if self.db.query(Earning).filter(Earning.photographer_id == ph_id).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete photographer: still has associated earnings."
+            )
+        
         return self._delete_and_refresh(ph)
 
     ############################################################################

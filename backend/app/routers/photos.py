@@ -67,6 +67,30 @@ def list_photos(offset: int = 0, limit: int = 10, db: Session = Depends(get_db))
 class PhotoIdsRequest(BaseModel):
     photo_ids: List[int]
 
+class CheckDuplicatesRequest(BaseModel):
+    hashes: List[str]
+    photographer_id: int
+
+class CheckDuplicatesResponse(BaseModel):
+    duplicate_hashes: List[str]
+
+@router.post("/check-duplicates", response_model=CheckDuplicatesResponse)
+def check_duplicates(
+    request: CheckDuplicatesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker([Permissions.UPLOAD_PHOTO]))
+):
+    """
+    Checks for existing photos by their content hashes.
+    Returns a list of hashes that are already in the database.
+    """
+    photo_service = PhotoService(db)
+    duplicate_hashes = photo_service.check_duplicate_photos(
+        hashes=request.hashes,
+        photographer_id=request.photographer_id
+    )
+    return {"duplicate_hashes": duplicate_hashes}
+
 @router.post("/by-ids", response_model=List[PhotoSchema])
 def get_photos_by_ids(request: PhotoIdsRequest, db: Session = Depends(get_db)):
     """

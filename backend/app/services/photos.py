@@ -18,6 +18,7 @@ from sqlalchemy.exc import NoResultFound
 class PhotoCompletionRequest(BaseModel):
     object_name: str
     original_filename: str
+    contentHash: str # Añadido para detección de duplicados
     description: str | None = None
     price: float
     photographer_id: int
@@ -134,6 +135,26 @@ class PhotoService(BaseService):
         )
         return [self._generate_presigned_urls(p) for p in photos]
 
+    def check_duplicate_photos(self, hashes: List[str], photographer_id: int) -> List[str]:
+        """
+        Checks if any of the given photo hashes already exist for a specific photographer.
+        Returns a list of content hashes that are found to be duplicates.
+        """
+        print(f"DEBUG: Checking for duplicate hashes for photographer_id {photographer_id}: {hashes}")
+
+        if not hashes:
+            return []
+        
+        # Buscar fotos que coincidan con los hashes
+        existing_photos_query = self.db.query(Photo.content_hash).filter(
+            Photo.content_hash.in_(hashes)
+        )
+        existing_photos = existing_photos_query.all()
+        
+        # Extraer los hashes de las fotos existentes
+        duplicate_hashes = [p.content_hash for p in existing_photos if p.content_hash is not None]
+        print(f"DEBUG: Found existing hashes: {duplicate_hashes}")
+        return duplicate_hashes
 
     def create_photo(self, photo_in: PhotoCreateSchema) -> Photo:
         """Creates a new photo record in the database."""
@@ -273,21 +294,56 @@ class PhotoService(BaseService):
     def finalize_photo_uploads(self, completion_requests: List[PhotoCompletionRequest], current_user: User, album_id: int | None = None) -> List[PhotoSchema]:
         from models.album import Album  # Importación local para evitar la dependencia circular
 
+        if not completion_requests:
+            return []
+
+        # 1. Extraer todos los hashes y object_names
+        all_hashes = [req.contentHash for req in completion_requests if req.contentHash]
+        print(f"DEBUG: Finalizing upload for hashes: {all_hashes}")
+        object_name_to_request_map = {req.object_name: req for req in completion_requests}
+
+        # 2. Identificar duplicados en una sola consulta
+        if all_hashes:
+            existing_hashes_query = self.db.query(Photo.content_hash).filter(Photo.content_hash.in_(all_hashes))
+            existing_hashes_results = existing_hashes_query.all()
+            existing_hashes = {res[0] for res in existing_hashes_results}
+            print(f"DEBUG: Hashes found in DB: {existing_hashes}")
+        else:
+            existing_hashes = set()
+
+        # 3. Procesar solicitudes: separar nuevas de duplicadas
+        new_requests = []
+        for req in completion_requests:
+            if req.contentHash in existing_hashes:
+                print(f"DEBUG: Skipping '{req.original_filename}' (hash: {req.contentHash}) as a duplicate.")
+                # Si es un duplicado, eliminar el archivo recién subido
+                try:
+                    storage_service.delete_file(req.object_name)
+                    # Opcional: registrar que se eliminó un duplicado
+                    print(f"Deleted duplicate upload from storage: {req.object_name}")
+                except Exception as e:
+                    # Opcional: registrar el error si la eliminación falla
+                    print(f"Error deleting duplicate file {req.object_name} from storage: {e}")
+            else:
+                print(f"DEBUG: Processing '{req.original_filename}' (hash: {req.contentHash}) as a new photo.")
+                new_requests.append(req)
+        
+        if not new_requests:
+            return []
+
+        # --- El resto del proceso solo opera sobre `new_requests` ---
+
         created_photos_schemas = []
         user_permissions = {p.name for p in current_user.role.permissions}
         can_edit_any = Permissions.EDIT_ANY_PHOTO.value in user_permissions or Permissions.FULL_ACCESS.value in user_permissions
-
-        if not completion_requests:
-            return []
         
-        # Determinar el precio por defecto del álbum si existe
         default_price = None
         if album_id:
             album = self.db.query(Album).filter(Album.id == album_id).first()
             if album and album.default_photo_price is not None:
                 default_price = album.default_photo_price
 
-        photographer_id = completion_requests[0].photographer_id
+        photographer_id = new_requests[0].photographer_id
 
         try:
             session_service = SessionService(self.db)
@@ -304,12 +360,11 @@ class PhotoService(BaseService):
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create photo session for batch: {str(e)}")
 
-        for photo_data in completion_requests:
+        for photo_data in new_requests:
             if not can_edit_any:
                 if not current_user.photographer or photo_data.photographer_id != current_user.photographer.id:
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Permission denied for photographer ID {photo_data.photographer_id}.")
             try:
-                # Usar el precio por defecto si está disponible; de lo contrario, usar el precio del request o 0
                 price_to_use = default_price if default_price is not None else photo_data.price
 
                 photo_in = PhotoCreateSchema(
@@ -320,12 +375,20 @@ class PhotoService(BaseService):
                     photographer_id=photo_data.photographer_id,
                     session_id=batch_session_id,
                 )
+                # Manually set content_hash as it's not in PhotoCreateSchema
+                created_photo = Photo(**photo_in.model_dump())
+                created_photo.content_hash = photo_data.contentHash
                 
-                created_photo = self.create_photo(photo_in=photo_in)
-                created_photos_schemas.append(self._generate_presigned_urls(created_photo))
+                saved_photo = self._save_and_refresh(created_photo)
+                created_photos_schemas.append(self._generate_presigned_urls(saved_photo))
 
             except Exception as e:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create photo record for {photo_data.original_filename}: {str(e)}")
+                # Si llegamos aquí, podría ser por una race condition donde el hash se insertó
+                # después de nuestra verificación inicial. La constraint `unique` nos protegería.
+                self.db.rollback()
+                print(f"Failed to create photo record for {photo_data.original_filename}: {e}")
+                # Opcional: podrías intentar eliminar el archivo de S3 aquí también
+                # si sospechas que el error se debe a la constraint de unicidad.
         
         return created_photos_schemas
 
