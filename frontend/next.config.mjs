@@ -19,6 +19,9 @@ const nextConfig = {
     ],
   },
 
+  // ✅ Reducir superficie futura (si algún dev intenta usar Server Actions)
+  serverActions: false,
+
   // ✅ Headers de seguridad (básicos y seguros)
   async headers() {
     return [
