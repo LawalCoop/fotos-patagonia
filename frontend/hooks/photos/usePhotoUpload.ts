@@ -689,7 +689,7 @@ export function usePhotoUpload(refetchPhotos?: () => void) {
           maxAttempts: 0,
           retryable: false,
           errorMessage: "Foto duplicada (ya existe en el sistema)",
-        }))
+        }) as UploadFileResult)
       ];
 
       const batchResult: UploadBatchResult = {
