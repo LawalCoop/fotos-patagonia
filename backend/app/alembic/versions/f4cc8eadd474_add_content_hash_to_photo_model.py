@@ -31,8 +31,17 @@ def upgrade() -> None:
         print(f"Could not drop upload_files or upload_sessions tables/indexes (they might not exist): {e}")
 
     op.add_column('photos', sa.Column('content_hash', sa.String(length=256), nullable=True))
-    op.drop_constraint('photos_object_name_key', 'photos', type_='unique')
-    op.drop_constraint('photos_thumbnail_object_name_key', 'photos', type_='unique')
+    
+    try:
+        op.drop_constraint('photos_object_name_key', 'photos', type_='unique')
+    except Exception as e:
+        print(f"Constraint 'photos_object_name_key' not found, skipping drop. Error: {e}")
+        
+    try:
+        op.drop_constraint('photos_thumbnail_object_name_key', 'photos', type_='unique')
+    except Exception as e:
+        print(f"Constraint 'photos_thumbnail_object_name_key' not found, skipping drop. Error: {e}")
+
     op.create_index(op.f('ix_photos_content_hash'), 'photos', ['content_hash'], unique=False)
     op.drop_column('photos', 'thumbnail_object_name')
     # ### end Alembic commands ###
