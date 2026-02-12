@@ -323,7 +323,7 @@ export function usePhotoUpload(refetchPhotos?: () => void) {
       
       // Inicializar originalResults con los archivos que son duplicados (fallidos).
       // Estos no se subirán, pero deben reportarse.
-      const originalFilesDuplicated = filesWithMetadata.filter(
+      originalFilesDuplicated = filesWithMetadata.filter(
         (f) => duplicateHashes.includes(f.contentHash)
       );
 
@@ -673,7 +673,7 @@ export function usePhotoUpload(refetchPhotos?: () => void) {
       console.error("❌ Error en upload:", err);
       setError(err.message || "Error al subir fotos");
 
-      const allOriginalsConsidered = [
+      const allOriginalsConsidered: UploadFileResult[] = [
         ...originalResults,
         ...originalFilesDuplicated.map(f => ({
           kind: "original",
