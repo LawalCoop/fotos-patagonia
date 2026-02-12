@@ -66,7 +66,17 @@ def upgrade() -> None:
 
     # Create new index and drop old column
     op.create_index(op.f('ix_photos_content_hash'), 'photos', ['content_hash'], unique=False)
-    op.drop_column('photos', 'thumbnail_object_name')
+    
+    # Drop column idempotently
+    op.execute("""
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'photos' AND column_name = 'thumbnail_object_name') THEN
+            ALTER TABLE photos DROP COLUMN thumbnail_object_name;
+        END IF;
+    END;
+    $$;
+    """)
     # ### end Alembic commands ###
 
 
