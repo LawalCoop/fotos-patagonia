@@ -282,6 +282,7 @@ export function usePhotoUpload(refetchPhotos?: () => void) {
     });
 
     let createdPhotos: BackendPhoto[] = [];
+    let originalFilesDuplicated: any[] = []; // Declarar aquí para que esté disponible en el catch
 
     try {
       // 0) Calcular hash de originales y LUEGO comprimir
