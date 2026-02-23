@@ -260,13 +260,18 @@ export default function CheckoutPage() {
 
     const orderDraftItems: OrderDraftItem[] = [...digitalLines, ...printLines];
 
-    // Lo que se envía al backend (OrderItemCreateSchema): solo price/quantity/photo_id
+    // FIX: Usar el precio efectivo para que coincida con el total de `useCartStore`
+    // que ya tiene combos/descuentos aplicados.
+    const hasItems = items.length > 0;
+    const effectivePricePerItem = hasItems ? effectiveTotal / items.length : 0;
+
     const orderItemsForBackend: OrderItem[] = orderDraftItems.map((it) => ({
-      price: it.price,
+      price: effectivePricePerItem,
       quantity: it.quantity,
       photo_id: Number(it.photoId),
       format: it.printFormatLabel,
     }));
+
 
     
     // Payload para backend (ajustar si el backend espera campos distintos)
