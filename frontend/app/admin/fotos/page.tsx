@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { DeleteConfirmationModal } from "@/components/molecules/delete-confirmat
 import { AdminPhotoCard } from "@/components/molecules/admin-photo-card"; // <- Importación correcta
 import type { UploadingPhoto } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 export default function FotosPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -163,6 +164,45 @@ export default function FotosPage() {
       );
     }
   };
+
+  // Virtualización (grilla)
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const measureRef = useRef<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState<number>(0);
+
+  const GRID_GAP_PX = 24; // gap-6
+  const ESTIMATED_ROW_HEIGHT = 320; // requerido: estimateSize fijo
+  const MIN_CARD_WIDTH_PX = 260; // aproximación para grilla responsive
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+  
+    const update = () => setGridWidth(el.getBoundingClientRect().width);
+    update();
+  
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const columns = useMemo(() => {
+    const w = gridWidth || 0;
+    if (w <= 0) return 1;
+    const cols = Math.floor((w + GRID_GAP_PX) / (MIN_CARD_WIDTH_PX + GRID_GAP_PX));
+    return Math.max(1, cols);
+  }, [gridWidth]);
+
+  const rowCount = useMemo(() => {
+    return Math.ceil(filteredPhotos.length / columns);
+  }, [filteredPhotos.length, columns]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 6,
+  });
 
   const handleUploadStart = (items: UploadingPhoto[]) => {
     if (!items.length) return;
@@ -358,20 +398,72 @@ export default function FotosPage() {
                 </div>
               );
             })}
-            {filteredPhotos.map((photo) => {
-              const selected = isSelected(photo.id);
-              return (
-                <AdminPhotoCard
-                  key={photo.id}
-                  photo={photo}
-                  isSelected={selected}
-                  onCheckboxClick={(e) => handleCheckboxClick(e, photo.id)}
-                  onEdit={() => handleEditPhoto(photo)}
-                  onDelete={() => handleDeletePhoto(photo)}
-                />
-              );
-            })}
           </div>
+
+          {filteredPhotos.length > 0 ? (
+            <div
+              ref={scrollRef}
+              className="relative"
+              style={{
+                height: "75vh",
+                overflow: "auto",
+              }}
+            >
+              <div
+                ref={measureRef}
+                style={{
+                  height: rowVirtualizer.getTotalSize(),
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const startIndex = virtualRow.index * columns;
+                  const rowItems = filteredPhotos.slice(
+                    startIndex,
+                    startIndex + columns
+                  );
+
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      className="grid gap-6"
+                      style={{
+                        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      {rowItems.map((photo) => {
+                        const selected = isSelected(photo.id);
+                        return (
+                          <AdminPhotoCard
+                            key={photo.id}
+                            photo={photo}
+                            isSelected={selected}
+                            onCheckboxClick={(e) =>
+                              handleCheckboxClick(e, photo.id)
+                            }
+                            onEdit={() => handleEditPhoto(photo)}
+                            onDelete={() => handleDeletePhoto(photo)}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <Card className="rounded-2xl border-gray-200">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No se encontraron fotos
+              </CardContent>
+            </Card>
+          )}
 
           {hasMore && (
             <div className="mt-8 flex justify-center">
@@ -384,14 +476,6 @@ export default function FotosPage() {
                 Ver más
               </Button>
             </div>
-          )}
-
-          {filteredPhotos.length === 0 && !loading && (
-            <Card className="rounded-2xl border-gray-200">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No se encontraron fotos
-              </CardContent>
-            </Card>
           )}
         </>
       )}
