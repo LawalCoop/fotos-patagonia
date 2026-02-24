@@ -43,13 +43,13 @@ def update_photographer(
 ):
     return PhotographerService(db).update_photographer(photographer_id, photographer_in)
 
-@router.delete("/{photographer_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_photographer(
+@router.delete("/{photographer_id}", status_code=status.HTTP_200_OK)
+def inactivate_photographer(
     photographer_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker([Permissions.DELETE_PHOTOGRAPHER]))
 ):
-    return PhotographerService(db).delete_photographer(photographer_id)
+    return PhotographerService(db).inactivate_photographer(photographer_id)
 
 # Earnings Endpoints
 
