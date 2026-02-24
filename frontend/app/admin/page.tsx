@@ -8,6 +8,7 @@ import {
   Camera,
   TrendingUp,
   ArrowRight,
+  User as UserIcon,
 } from "lucide-react";
 import {
   Card,
@@ -16,8 +17,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { Order } from "@/lib/types";
+import type { Order, EarningsSummary } from "@/lib/types";
 import { getUserRoleName, isAdmin } from "@/lib/types";
 import { usePhotos } from "@/hooks/photos/usePhotos";
 import { useAuthStore } from "@/lib/store";
@@ -31,303 +39,262 @@ export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
   const { photos, loading: photosLoading } = usePhotos();
   const { data: ordersData, loading: ordersLoading } = useOrders();
+  const { photographers, isLoading: photographersLoading } = usePhotographers();
+
   const photographerId = useMemo(
     () => user?.photographer?.id ?? user?.photographer_id ?? null,
     [user]
   );
-  // Normalizar pedidos a array con referencia estable
+
   const orders: Order[] = useMemo(
     () => (Array.isArray(ordersData) ? ordersData : ordersData ? [ordersData] : []),
     [ordersData]
   );
 
-  // Obtener información del rol
   const roleName = getUserRoleName(user)?.toLowerCase();
   const userIsAdmin = isAdmin(user);
 
-  const filteredOrders = useMemo(() => {
-    if (ordersLoading) return [];
-
-    if (userIsAdmin || !photographerId) return orders;
-
-    const ordersWithPhotographerItems: Order[] = [];
-
-    orders.forEach((order) => {
-      const photographerItems = (order.items || []).filter((item) => {
-        return item.photo?.photographer_id === photographerId;
-      });
-
-      if (photographerItems.length > 0) {
-        const photographerTotal = photographerItems.reduce(
-          (sum, item) => sum + (item.price || 0),
-          0
-        );
-        ordersWithPhotographerItems.push({
-          ...order,
-          items: photographerItems,
-          total: photographerTotal,
-        });
-      }
-    });
-
-    return ordersWithPhotographerItems;
-  }, [orders, ordersLoading, userIsAdmin, photographerId]);
-
-  const stats = useMemo(() => {
-    if (ordersLoading || photosLoading)
-      return { totalOrders: 0, pendingOrders: 0, totalPhotos: 0 };
-
-    const pendingOrders = filteredOrders.filter(
-      (o) => o.order_status === "pending" || o.order_status === "paid"
-    ).length;
-
-    const totalPhotos = userIsAdmin
-      ? photos.length
-      : photos.filter((p) => p.photographer_id === photographerId).length;
-
-    return {
-      totalOrders: filteredOrders.length,
-      pendingOrders,
-      totalPhotos,
-    };
-  }, [filteredOrders, photos, photosLoading, ordersLoading, userIsAdmin, photographerId]);
-
-  const toMillis = (value?: string | null) =>
-    value ? new Date(value).getTime() : 0;
-
-  const recentOrders = [...filteredOrders]
-    .sort((a, b) => {
-      const da = toMillis(a.created_at ?? a.createdAt);
-      const db = toMillis(b.created_at ?? b.createdAt);
-      return db - da; // más reciente primero
-    })
-    .slice(0, 5);
-
-  // Textos dinámicos según el rol
-  const isPhotographer = !userIsAdmin && !!photographerId;
-  const texts = {
-    title: isPhotographer ? "Mi Panel" : "Panel de Administración",
-    subtitle: isPhotographer
-      ? "Visualiza tus métricas y pedidos"
-      : "Gestiona pedidos, fotos y contenido de Fotos Patagonia",
-    ordersTitle: isPhotographer ? "Mis Pedidos" : "Total Pedidos",
-    ordersDesc: isPhotographer
-      ? "Pedidos con tus fotos"
-      : "Todos los pedidos registrados",
-    revenueTitle: isPhotographer ? "Mis Ingresos" : "Ingresos Totales",
-    revenueDesc: isPhotographer
-      ? "Ingresos de tus fotos"
-      : "Suma de todos los pedidos",
-    pendingTitle: isPhotographer ? "Mis Pendientes" : "Pedidos Pendientes",
-    photosTitle: isPhotographer ? "Mis Fotos" : "Total Fotos",
-    photosDesc: isPhotographer ? "Tus fotos en el catálogo" : "En el catálogo",
-    recentOrdersTitle: isPhotographer
-      ? "Mis Pedidos Recientes"
-      : "Pedidos Recientes",
-    recentOrdersDesc: isPhotographer
-      ? "Últimos 5 pedidos con tus fotos"
-      : "Últimos 5 pedidos realizados",
-  };
-
+  // --- FILTERS STATE ---
   const [startDateInput, setStartDateInput] = useState<string>("");
   const [endDateInput, setEndDateInput] = useState<string>("");
-  const [appliedStartDate, setAppliedStartDate] = useState<string | undefined>(
-    undefined
-  );
-  const [appliedEndDate, setAppliedEndDate] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>("");
 
-  const {
-    data: earningsAll,
-    loading: earningsLoading,
-  } = useEarningsSummaryAll(appliedStartDate, appliedEndDate, {
-    enabled: userIsAdmin,
-  });
+  const [appliedStartDate, setAppliedStartDate] = useState<string | undefined>(undefined);
+  const [appliedEndDate, setAppliedEndDate] = useState<string | undefined>(undefined);
+  const [appliedPhotographerId, setAppliedPhotographerId] = useState<string>("");
+
+  // --- DATA FETCHING ---
+  const { data: earningsAll, loading: earningsAllLoading } = useEarningsSummaryAll(
+    appliedStartDate,
+    appliedEndDate,
+    { enabled: userIsAdmin && !appliedPhotographerId }
+  );
 
   const { getPhotographerEarningsSummary } = usePhotographers();
-  const [mySummary, setMySummary] = useState<number>(0);
+  const [
+    photographerSummary,
+    setPhotographerSummary,
+  ] = useState<EarningsSummary | null>(null);
+  const [photographerSummaryLoading, setPhotographerSummaryLoading] = useState(false);
 
-  const handleApplyDateFilter = async () => {
-    const newStart = startDateInput || undefined;
-    const newEnd = endDateInput || undefined;
-    setAppliedStartDate(newStart);
-    setAppliedEndDate(newEnd);
+  // --- LOGIC ---
+  const handleApplyFilters = () => {
+    setAppliedStartDate(startDateInput || undefined);
+    setAppliedEndDate(endDateInput || undefined);
+    setAppliedPhotographerId(selectedPhotographerId === "all" ? "" : selectedPhotographerId);
   };
 
   useEffect(() => {
-    if (!userIsAdmin && photographerId) {
-      (async () => {
-        const summary = await getPhotographerEarningsSummary(photographerId, {
-          startDate: appliedStartDate,
-          endDate: appliedEndDate,
-        });
-        setMySummary(summary.total_earnings);
-      })();
-    }
+    const fetchSummary = async () => {
+      if (appliedPhotographerId && userIsAdmin) {
+        setPhotographerSummaryLoading(true);
+        try {
+          const summary = await getPhotographerEarningsSummary(
+            parseInt(appliedPhotographerId, 10),
+            {
+              startDate: appliedStartDate,
+              endDate: appliedEndDate,
+            }
+          );
+          setPhotographerSummary(summary);
+        } catch (error) {
+          console.error("Error fetching photographer summary:", error);
+          setPhotographerSummary(null);
+        } finally {
+          setPhotographerSummaryLoading(false);
+        }
+      } else {
+        setPhotographerSummary(null);
+      }
+    };
+
+    fetchSummary();
   }, [
-    userIsAdmin,
-    photographerId,
+    appliedPhotographerId,
     appliedStartDate,
     appliedEndDate,
+    userIsAdmin,
     getPhotographerEarningsSummary,
   ]);
+  
+  const filteredOrders = useMemo(() => {
+    if (ordersLoading) return [];
+    if (!userIsAdmin) return []; // Simplified for admin view
+
+    if (!appliedPhotographerId) return orders;
+
+    const phId = parseInt(appliedPhotographerId, 10);
+    return orders.filter(order => 
+      order.items?.some(item => item.photo?.photographer_id === phId)
+    );
+  }, [orders, ordersLoading, userIsAdmin, appliedPhotographerId]);
+
+  const stats = useMemo(() => {
+    if (ordersLoading || photosLoading)
+      return { totalOrders: 0, pendingOrders: 0, totalPhotos: 0, totalRevenue: 0 };
+    
+    const phId = appliedPhotographerId ? parseInt(appliedPhotographerId, 10) : null;
+
+    const currentOrders = phId
+      ? orders.filter(o => o.items?.some(item => item.photo?.photographer_id === phId))
+      : orders;
+
+    const pendingOrders = currentOrders.filter(
+      (o) => o.order_status === "pending" || o.order_status === "paid"
+    ).length;
+
+    const totalPhotos = phId
+      ? photos.filter((p) => p.photographer_id === phId).length
+      : photos.length;
+
+    let totalRevenue = 0;
+    if (phId) {
+      totalRevenue = photographerSummary?.total_earnings ?? 0;
+    } else {
+      totalRevenue = earningsAll?.reduce((sum, r) => sum + r.total_earnings, 0) || 0;
+    }
+    
+    return {
+      totalOrders: currentOrders.length,
+      pendingOrders,
+      totalPhotos,
+      totalRevenue,
+    };
+  }, [
+    orders,
+    photos,
+    photosLoading,
+    ordersLoading,
+    appliedPhotographerId,
+    photographerSummary,
+    earningsAll,
+  ]);
+
+  const isPhotographer = !userIsAdmin && !!photographerId;
+
+  if (isPhotographer && photographerId) {
+    return <PhotographerDashboard photographerId={photographerId} />;
+  }
+  
+  const isLoading = earningsAllLoading || photographerSummaryLoading;
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="mb-2 text-4xl font-bold">{texts.title}</h1>
-        <p className="text-muted-foreground">{texts.subtitle}</p>
+        <h1 className="mb-2 text-4xl font-bold">Panel de Administración</h1>
+        <p className="text-muted-foreground">
+          Gestiona pedidos, fotos y contenido de Fotos Patagonia
+        </p>
       </div>
-      {(userIsAdmin || photographerId) && (
-        <div className="mb-6 flex gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Fecha desde
-            </label>
-            <input
-              type="date"
-              className="border rounded-lg p-2"
-              value={startDateInput}
-              onChange={(e) => setStartDateInput(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Fecha hasta
-            </label>
-            <input
-              type="date"
-              className="border rounded-lg p-2"
-              value={endDateInput}
-              onChange={(e) => setEndDateInput(e.target.value)}
-            />
-          </div>
-          <Button
-            onClick={handleApplyDateFilter}
-            disabled={earningsLoading && userIsAdmin}
-            className="h-10"
-          >
-            {earningsLoading && userIsAdmin ? "Cargando..." : "Aplicar"}
-          </Button>
+      
+      <div className="mb-6 flex flex-wrap gap-4 items-end">
+        <div>
+          <label className="block text-sm font-medium mb-1">Fecha desde</label>
+          <input
+            type="date"
+            className="border rounded-lg p-2 h-10"
+            value={startDateInput}
+            onChange={(e) => setStartDateInput(e.target.value)}
+          />
         </div>
-      )}
+        <div>
+          <label className="block text-sm font-medium mb-1">Fecha hasta</label>
+          <input
+            type="date"
+            className="border rounded-lg p-2 h-10"
+            value={endDateInput}
+            onChange={(e) => setEndDateInput(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Fotógrafo</label>
+          <Select
+            value={selectedPhotographerId}
+            onValueChange={setSelectedPhotographerId}
+            disabled={photographersLoading}
+          >
+            <SelectTrigger className="w-full md:w-[200px] h-10">
+              <SelectValue placeholder="Seleccionar fotógrafo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los fotógrafos</SelectItem>
+              {photographers.map((ph) => (
+                <SelectItem key={ph.id} value={String(ph.id)}>
+                  {ph.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={handleApplyFilters} disabled={isLoading} className="h-10">
+          {isLoading ? "Cargando..." : "Aplicar"}
+        </Button>
+      </div>
 
       <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-2xl border-gray-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {texts.ordersTitle}
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalOrders}</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {texts.ordersDesc}
-            </p>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-gray-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {texts.revenueTitle}
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {userIsAdmin
-                ? `$${(
-                    earningsAll?.reduce(
-                      (sum, r) => sum + r.total_earnings,
-                      0
-                    ) || 0
-                  ).toLocaleString()}`
-                : `$${mySummary.toLocaleString()}`}
+              ${stats.totalRevenue.toLocaleString()}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {texts.revenueDesc}
-            </p>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-gray-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {texts.pendingTitle}
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Pedidos Pendientes</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.pendingOrders}</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Requieren atención
-            </p>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-gray-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {texts.photosTitle}
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Fotos</CardTitle>
             <Camera className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalPhotos}</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {texts.photosDesc}
-            </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="mb-8 grid gap-6 md:grid-cols-2">
-        {userIsAdmin && (
-          <>
-            <Card className="rounded-2xl border-gray-200">
-              <CardHeader>
-                <CardTitle>Gestión de Pedidos</CardTitle>
-                <CardDescription>
-                  Ver y administrar todos los pedidos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/admin/pedidos">
-                  <Button className="w-full rounded-xl bg-primary font-semibold text-foreground hover:bg-primary-hover">
-                    Ver Pedidos
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-            <Card className="rounded-2xl border-gray-200">
-              <CardHeader>
-                <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
-                <CardDescription>
-                  Administrar álbumes, fotógrafos, tags y códigos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/admin/abm">
-                  <Button className="w-full rounded-xl bg-primary font-semibold text-foreground hover:bg-primary-hover">
-                    Gestionar Contenido
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </>
-        )}
-        <Card className="rounded-2xl border-gray-200">
+        <Card>
           <CardHeader>
-            <CardTitle>Gestión de Fotos</CardTitle>
-            <CardDescription>Administrar catálogo de fotos</CardDescription>
+            <CardTitle>Gestión de Pedidos</CardTitle>
+            <CardDescription>Ver y administrar todos los pedidos</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/admin/fotos">
-              <Button className="w-full rounded-xl bg-primary font-semibold text-foreground hover:bg-primary-hover">
-                Ver Fotos
-                <ArrowRight className="ml-2 h-4 w-4" />
+            <Link href="/admin/pedidos">
+              <Button className="w-full">
+                Ver Pedidos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
+            <CardDescription>Administrar álbumes, fotógrafos, tags y códigos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/abm">
+              <Button className="w-full">
+                Gestionar Contenido <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardContent>
@@ -335,52 +302,26 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {isPhotographer && photographerId ? (
-          <div className="md:col-span-2">
-            <PhotographerDashboard photographerId={photographerId} />
-          </div>
-        ) : (
-          <>
-            {/* Recent Orders for Admin */}
-            <Card className="rounded-2xl border-gray-200">
-              <CardHeader>
-                <CardTitle>{texts.recentOrdersTitle}</CardTitle>
-                <CardDescription>{texts.recentOrdersDesc}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentOrders.length === 0 ? (
-                  <div className="py-8 text-center text-muted-foreground">
-                    No hay pedidos registrados
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between rounded-xl border border-gray-200 p-4"
-                      >
-                        <div className="flex-1">
-                          <p className="font-semibold">Pedido #{order.id}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {order.customer_email || "Sin email"}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">${order.total}</p>
-                          <p className="text-sm capitalize text-muted-foreground">
-                            {order.order_status?.replace("_", " ") || "Sin estado"}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            {/* Recent Sessions for Admin */}
-            <RecentSessions />
-          </>
-        )}
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Pedidos Recientes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredOrders.slice(0, 5).map((order) => (
+              <div key={order.id} className="flex items-center justify-between mb-2 p-2 border-b">
+                <div>
+                  <p className="font-semibold">Pedido #{order.id}</p>
+                  <p className="text-sm text-muted-foreground">{order.customer_email}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold">${order.total}</p>
+                  <p className="text-sm capitalize">{order.order_status}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <RecentSessions />
       </div>
     </div>
   );
