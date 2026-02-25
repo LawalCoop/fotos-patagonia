@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import { DeleteConfirmationModal } from "@/components/molecules/delete-confirmat
 import { AdminPhotoCard } from "@/components/molecules/admin-photo-card"; // <- Importación correcta
 import type { UploadingPhoto } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 export default function FotosPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,6 +46,7 @@ export default function FotosPage() {
   const [offset, setOffset] = useState(0);
   const LIMIT = 10;
   const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Obtener fotos y sesiones del backend
   const { loading, deletePhoto, fetchPhotosPage, getPhoto } = usePhotos();
@@ -72,26 +75,26 @@ export default function FotosPage() {
     setIsModalOpen(true);
   };
 
-  const handleEditPhoto = (photo: BackendPhoto) => {
+  const handleEditPhoto = useCallback((photo: BackendPhoto) => {
     setModalMode("edit");
     setSelectedPhoto(photo);
     setIsModalOpen(true);
-  };
+  }, []);
 
   // Preparar eliminación individual: reutiliza el modal de confirmación
-  const handleDeletePhoto = (photo: BackendPhoto) => {
+  const handleDeletePhoto = useCallback((photo: BackendPhoto) => {
     setDeleteTargetIds([photo.id]);
     setIsConfirmOpen(true);
-  };
+  }, []);
 
   // Preparar eliminación múltiple
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = useCallback(() => {
     if (selectedPhotoIds.length === 0) return;
     setDeleteTargetIds(selectedPhotoIds);
     setIsConfirmOpen(true);
-  };
+  }, []);
 
-  const performDelete = async () => {
+  const performDelete = useCallback(async () => {
     if (deleteTargetIds.length === 0) return;
     setDeleting(true);
     try {
@@ -112,7 +115,7 @@ export default function FotosPage() {
     } finally {
       setDeleting(false);
     }
-  };
+  }, [deleteTargetIds, deletePhoto]);
 
   const handlePhotoSaved = async () => {
     if (!selectedPhoto) return;
@@ -135,12 +138,25 @@ export default function FotosPage() {
     );
   };
 
-  const handleCheckboxClick = (e: React.MouseEvent, id?: number) => {
-    e.stopPropagation();
-    if (id !== undefined) toggleSelect(id);
-  };
+  const handleCheckboxClick = useCallback(
+    (e: React.MouseEvent, id: number) => {
+      e.stopPropagation();
+      setSelectedPhotoIds((prev) =>
+        prev.includes(id)
+          ? prev.filter((x) => x !== id)
+          : [...prev, id]
+      );
+    },
+    []
+  );
 
-  const isSelected = (id: number) => selectedPhotoIds.includes(id);
+  const selectedSet = useMemo(
+    () => new Set(selectedPhotoIds),
+    [selectedPhotoIds]
+  );
+  
+  const isSelected = (id: number) =>
+    selectedSet.has(id);
 
 
   //sellecccionar todas las fotos
@@ -164,6 +180,101 @@ export default function FotosPage() {
     }
   };
 
+  // Virtualización (grilla)
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const measureRef = useRef<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState<number>(0);
+
+  const GRID_GAP_PX = 24; // gap-6
+  const ESTIMATED_ROW_HEIGHT = 320; // requerido: estimateSize fijo
+  const MIN_CARD_WIDTH_PX = 260; // aproximación para grilla responsive
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+  
+    const update = () => setGridWidth(el.getBoundingClientRect().width);
+    update();
+  
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const columns = useMemo(() => {
+    const w = gridWidth || 0;
+    if (w <= 0) return 1;
+    const cols = Math.floor((w + GRID_GAP_PX) / (MIN_CARD_WIDTH_PX + GRID_GAP_PX));
+    return Math.max(1, cols);
+  }, [gridWidth]);
+
+  const rowCount = useMemo(() => {
+    return Math.ceil(filteredPhotos.length / columns);
+  }, [filteredPhotos.length, columns]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 6,
+  });
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || loading || loadingMore) return;
+  
+    setLoadingMore(true);
+  
+    try {
+      const data =
+        (await fetchPhotosPage({ offset, limit: LIMIT })) ?? [];
+  
+      const filtered = data.filter(
+        (photo) =>
+          !newPhotos.some((p) => p.id === photo.id) &&
+          !oldPhotos.some((p) => p.id === photo.id)
+      );
+  
+      setOldPhotos((prev) => [...prev, ...filtered]);
+      setOffset((prev) => prev + LIMIT);
+  
+      if (data.length < LIMIT) {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error cargando más fotos", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    hasMore,
+    loading,
+    loadingMore,
+    offset,
+    fetchPhotosPage,
+    newPhotos,
+    oldPhotos,
+  ]);
+  // Infinite scroll: cuando el último row visible está cerca del final, cargar más
+  useEffect(() => {
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const lastItem = virtualItems[virtualItems.length - 1];
+
+    if (
+      lastItem &&
+      lastItem.index >= rowCount - 2 &&
+      hasMore &&
+      !loading &&
+      !loadingMore
+    ) {
+      handleLoadMore();
+    }
+}, [
+  rowVirtualizer,
+  rowCount,
+  hasMore,
+  loading,
+  loadingMore,
+  handleLoadMore,
+]);
   const handleUploadStart = (items: UploadingPhoto[]) => {
     if (!items.length) return;
     setUploadingPhotos((prev) => [...items, ...prev]);
@@ -221,30 +332,7 @@ export default function FotosPage() {
     );
   };
 
-  const handleLoadMore = async () => {
-    if (!hasMore || loading) return;
   
-    try {
-      const data =
-        (await fetchPhotosPage({ offset, limit: LIMIT })) ?? [];
-  
-      // evitar duplicados
-      const filtered = data.filter(
-        (photo) =>
-          !newPhotos.some((p) => p.id === photo.id) &&
-          !oldPhotos.some((p) => p.id === photo.id)
-      );
-  
-      setOldPhotos((prev) => [...prev, ...filtered]);
-      setOffset((prev) => prev + LIMIT);
-  
-      if (data.length < LIMIT) {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error("Error cargando más fotos", error);
-    }
-  };
   
   
   return (
@@ -358,41 +446,71 @@ export default function FotosPage() {
                 </div>
               );
             })}
-            {filteredPhotos.map((photo) => {
-              const selected = isSelected(photo.id);
-              return (
-                <AdminPhotoCard
-                  key={photo.id}
-                  photo={photo}
-                  isSelected={selected}
-                  onCheckboxClick={(e) => handleCheckboxClick(e, photo.id)}
-                  onEdit={() => handleEditPhoto(photo)}
-                  onDelete={() => handleDeletePhoto(photo)}
-                />
-              );
-            })}
           </div>
 
-          {hasMore && (
-            <div className="mt-8 flex justify-center">
-              <Button
-                variant="outline"
-                onClick={handleLoadMore}
-                disabled={loading}
-                className="rounded-xl"
+          {filteredPhotos.length > 0 ? (
+            <div
+              ref={scrollRef}
+              className="relative"
+              style={{
+                height: "75vh",
+                overflow: "auto",
+              }}
+            >
+              <div
+                ref={measureRef}
+                style={{
+                  height: rowVirtualizer.getTotalSize(),
+                  width: "100%",
+                  position: "relative",
+                }}
               >
-                Ver más
-              </Button>
-            </div>
-          )}
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const startIndex = virtualRow.index * columns;
+                  const rowItems = filteredPhotos.slice(
+                    startIndex,
+                    startIndex + columns
+                  );
 
-          {filteredPhotos.length === 0 && !loading && (
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      className="grid gap-6"
+                      style={{
+                        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      {rowItems.map((photo) => {
+                        const selected = isSelected(photo.id);
+                        return (
+                          <AdminPhotoCard
+                          key={photo.id}
+                          photo={photo}
+                          isSelected={selected}
+                          onCheckboxClick={handleCheckboxClick}
+                          onEdit={handleEditPhoto}
+                          onDelete={handleDeletePhoto}
+                        />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
             <Card className="rounded-2xl border-gray-200">
               <CardContent className="py-12 text-center text-muted-foreground">
                 No se encontraron fotos
               </CardContent>
             </Card>
           )}
+
         </>
       )}
 

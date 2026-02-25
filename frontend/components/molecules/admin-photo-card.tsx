@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Image from "next/image";
 import { Check, Pencil, Trash, Image as ImageIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -13,12 +13,12 @@ import type { BackendPhoto } from "@/hooks/photos/usePhotos"; // Ajusta la ruta 
 interface AdminPhotoCardProps {
   photo: BackendPhoto;
   isSelected: boolean;
-  onCheckboxClick: (e: React.MouseEvent) => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onCheckboxClick: (e: React.MouseEvent, id: number) => void;
+  onEdit: (photo: BackendPhoto) => void;
+  onDelete: (photo: BackendPhoto) => void;
 }
 
-export function AdminPhotoCard({
+function AdminPhotoCardComponent({
   photo,
   isSelected,
   onCheckboxClick,
@@ -27,6 +27,7 @@ export function AdminPhotoCard({
 }: AdminPhotoCardProps) {
   const previewObjectName =
     photo.thumbnail_object_name ?? buildThumbObjectName(photo.object_name);
+
   const { url: imageUrl, loading: imageLoading } =
     usePresignedUrl(previewObjectName);
 
@@ -54,7 +55,7 @@ export function AdminPhotoCard({
         {/* SELECCIÓN */}
         <div className="absolute right-3 top-3 z-20">
           <button
-            onClick={onCheckboxClick}
+            onClick={(e) => onCheckboxClick(e, photo.id)}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all",
               isSelected
@@ -69,9 +70,9 @@ export function AdminPhotoCard({
         {/* ACCIONES (hover) */}
         <div className="absolute left-3 top-3 z-20 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <Button
-            size="icon"
+            size="icon" 
             variant="outline"
-            onClick={onEdit}
+            onClick={() => onEdit(photo)}
             className="h-8 w-8 rounded-full bg-white/20 backdrop-blur border-white hover:bg-white/40"
           >
             <Pencil className="h-4 w-4 text-white" />
@@ -79,7 +80,7 @@ export function AdminPhotoCard({
           <Button
             size="icon"
             variant="outline"
-            onClick={onDelete}
+            onClick={() => onDelete(photo)}
             className="h-8 w-8 rounded-full bg-white/20 backdrop-blur border-white hover:bg-white/40"
           >
             <Trash className="h-4 w-4 text-white" />
@@ -101,3 +102,5 @@ export function AdminPhotoCard({
     </Card>
   );
 }
+
+export const AdminPhotoCard = memo(AdminPhotoCardComponent);
