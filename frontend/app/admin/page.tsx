@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { Order, EarningsSummary } from "@/lib/types";
+import type { Order, PhotographerEarningsSummary } from "@/lib/types";
 import { getUserRoleName, isAdmin } from "@/lib/types";
 import { usePhotos } from "@/hooks/photos/usePhotos";
 import { useAuthStore } from "@/lib/store";
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
   const [
     photographerSummary,
     setPhotographerSummary,
-  ] = useState<EarningsSummary | null>(null);
+  ] = useState<PhotographerEarningsSummary | null>(null);
   const [photographerSummaryLoading, setPhotographerSummaryLoading] = useState(false);
 
   // --- LOGIC ---
