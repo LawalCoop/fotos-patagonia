@@ -42,7 +42,7 @@ class PhotographerService(BaseService):
         self.db = db
     ############################################################################
     def list_photographers(self):
-        photographers = self.db.query(Photographer).all()
+        photographers = self.db.query(Photographer).filter(Photographer.is_active == True).all()
         return photographers
     ############################################################################
     def create_photographer(self, ph_in: PhotographerCreateSchema):
@@ -83,11 +83,14 @@ class PhotographerService(BaseService):
         return self._save_and_refresh(new_ph)
     ############################################################################
     def get_photographer(self, ph_id: int):
-        ph = self.db.query(Photographer).filter(Photographer.id==ph_id).first()
+        ph = self.db.query(Photographer).filter(
+            Photographer.id == ph_id,
+            Photographer.is_active == True
+        ).first()
         if not ph:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Photographer not found"
+                detail="Photographer not found or is inactive"
             )
         return ph
     ############################################################################
@@ -107,8 +110,8 @@ class PhotographerService(BaseService):
         
         return self._save_and_refresh(ph)
     ############################################################################
-    def delete_photographer(self, ph_id: int):
-        ph = self.db.query(Photographer).filter(Photographer.id==ph_id).first()
+    def inactivate_photographer(self, ph_id: int):
+        ph = self.db.query(Photographer).options(joinedload(Photographer.user)).filter(Photographer.id==ph_id).first()
 
         if not ph:
             raise HTTPException(
@@ -116,21 +119,15 @@ class PhotographerService(BaseService):
                 detail="Photographer not found"
             )
 
-        # Check for associated photo sessions
-        if self.db.query(PhotoSession).filter(PhotoSession.photographer_id == ph_id).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete photographer: still has associated photo sessions."
-            )
-
-        # Check for associated earnings
-        if self.db.query(Earning).filter(Earning.photographer_id == ph_id).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete photographer: still has associated earnings."
-            )
+        ph.is_active = False
+        if ph.user:
+            ph.user.is_active = False
         
-        return self._delete_and_refresh(ph)
+        self.db.add(ph)
+        self.db.commit()
+        self.db.refresh(ph)
+        
+        return {"message": "Photographer inactivated successfully"}
 
     ############################################################################
     # Earnings Methods

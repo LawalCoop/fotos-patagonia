@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from db.base import Base
 from typing import Optional
@@ -36,6 +36,7 @@ class Photographer(Base):
     name = Column(String(100), index=True, nullable=False)
     commission_percentage = Column(Float, nullable=False)
     contact_info = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     user = relationship("User", back_populates="photographer")
     photos = relationship("Photo", back_populates="photographer")
