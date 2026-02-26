@@ -39,7 +39,7 @@ export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
   const { photos, loading: photosLoading } = usePhotos();
   const { data: ordersData, loading: ordersLoading } = useOrders();
-  const { photographers, isLoading: photographersLoading } = usePhotographers();
+  const { photographers, loading: photographersLoading } = usePhotographers();
 
   const photographerId = useMemo(
     () => user?.photographer?.id ?? user?.photographer_id ?? null,
