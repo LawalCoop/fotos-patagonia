@@ -279,6 +279,29 @@ class PhotographerService(BaseService):
             ]
         )
 
+    def get_admin_earnings_report(
+        self,
+        current_user: User,
+        start_date: date | None = None,
+        end_date: date | None = None
+    ) -> List[EarningsSummarySchema]:
+        """
+        Generates a detailed earnings report for all active photographers.
+        """
+        photographers = self.db.query(Photographer).filter(Photographer.is_active == True).all()
+        
+        report = []
+        for photographer in photographers:
+            summary = self.get_photographer_earnings_summary(
+                photographer_id=photographer.id,
+                current_user=current_user,
+                start_date=start_date,
+                end_date=end_date
+            )
+            report.append(summary)
+            
+        return report
+
     def get_all_earnings_summaries(
         self,
         start_date: date | None = None,

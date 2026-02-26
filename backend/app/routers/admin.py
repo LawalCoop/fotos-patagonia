@@ -10,11 +10,31 @@ from models.user import User
 from core.permissions import Permissions
 from fastapi import APIRouter, Depends, HTTPException
 
+from services.photographers import PhotographerService, EarningsSummarySchema
+from datetime import date
+
 router = APIRouter(
     prefix="/admin",
     tags=["Admin"],
     dependencies=[Depends(PermissionChecker([Permissions.VIEW_ANY_EARNINGS]))]
 )
+
+@router.get("/earnings-report", response_model=List[EarningsSummarySchema])
+def get_earnings_report(
+    db: Session = Depends(get_db),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    current_user: User = Depends(PermissionChecker([Permissions.VIEW_ANY_EARNINGS]))
+):
+    """
+    Provides a detailed earnings report for each photographer, including total earnings,
+    photos sold, and detailed sales information. Can be filtered by a date range.
+    """
+    return PhotographerService(db).get_admin_earnings_report(
+        current_user=current_user,
+        start_date=start_date,
+        end_date=end_date
+    )
 
 @router.get("/dashboard", response_model=AdminDashboardSchema)
 def get_admin_dashboard(
