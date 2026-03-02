@@ -37,9 +37,14 @@ import { RecentSessions } from "@/components/organisms/RecentSessions";
 
 export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
-  const { photos, loading: photosLoading } = usePhotos();
-  const { data: ordersData, loading: ordersLoading } = useOrders();
+  const { photos, loading: photosLoading, refetch: refetchPhotos } = usePhotos();
+  const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useOrders();
   const { photographers, loading: photographersLoading } = usePhotographers();
+
+  useEffect(() => {
+    refetchPhotos();
+    refetchOrders();
+  }, [refetchPhotos, refetchOrders]);
 
   const photographerId = useMemo(
     () => user?.photographer?.id ?? user?.photographer_id ?? null,
@@ -139,9 +144,14 @@ export default function AdminDashboard() {
       ? orders.filter(o => o.items?.some(item => item.photo?.photographer_id === phId))
       : orders;
 
-    const pendingOrders = currentOrders.filter(
-      (o) => o.order_status === "pending" || o.order_status === "paid"
-    ).length;
+    const ordersByPaymentMethod = currentOrders.reduce((acc, order) => {
+      const paymentMethod = order.payment_method || "desconocido";
+      if (!acc[paymentMethod]) {
+        acc[paymentMethod] = 0;
+      }
+      acc[paymentMethod]++;
+      return acc;
+    }, {} as Record<string, number>);
 
     const totalPhotos = phId
       ? photos.filter((p) => p.photographer_id === phId).length
@@ -156,7 +166,7 @@ export default function AdminDashboard() {
     
     return {
       totalOrders: currentOrders.length,
-      pendingOrders,
+      ordersByPaymentMethod,
       totalPhotos,
       totalRevenue,
     };
@@ -254,11 +264,17 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pedidos Pendientes</CardTitle>
+            <CardTitle className="text-sm font-medium">Ventas por medio de pago</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{stats.pendingOrders}</div>
+            {stats.ordersByPaymentMethod &&
+              Object.entries(stats.ordersByPaymentMethod).map(([method, count]) => (
+                <div key={method} className="flex justify-between items-center text-sm">
+                  <span className="capitalize">{method}</span>
+                  <span className="font-bold">{count}</span>
+                </div>
+              ))}
           </CardContent>
         </Card>
         <Card>
