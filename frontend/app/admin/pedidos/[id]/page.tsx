@@ -26,9 +26,9 @@ import { DownloadConfirmationModal } from "@/components/molecules/download-confi
 
 const QR_CANVAS_ID = "order-download-qr-canvas";
 
-const buildPhotoFilename = (photo: Photo) => {
+const buildPhotoFilename = (photo: Photo, format?: string | null) => {
   const sanitizedPlace = photo.place?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `foto-${photo.id}`;
-  return `${sanitizedPlace}.jpg`;
+  return `${sanitizedPlace}${format ? `-${format}` : ""}.jpg`;
 };
 const buildZipFilename = (photo: Photo, index: number) => {
   const base = buildPhotoFilename(photo).replace(".jpg", "");
@@ -76,7 +76,7 @@ const fetchPresignedUrl = async (photo: Photo) => {
 };
 
 // Sub-componente para manejar la lógica de la URL presignada
-function PhotoGridItem({ photo, canDownload, isDownloading }: { photo: Photo, canDownload: boolean, isDownloading: boolean }) {
+function PhotoGridItem({ photo, format, canDownload, isDownloading }: { photo: Photo, format?: string | null, canDownload: boolean, isDownloading: boolean }) {
   const { url, loading, error } = usePresignedUrl(photo.objectName);
 
   if (loading) {
@@ -97,6 +97,13 @@ function PhotoGridItem({ photo, canDownload, isDownloading }: { photo: Photo, ca
 
   return (
     <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-muted">
+      {format && (
+  <div className="absolute top-2 right-2 z-10">
+    <Badge className="bg-primary text-foreground text-xs rounded-full px-3 py-1">
+      {format}
+    </Badge>
+  </div>
+)}
       <WatermarkedImage
         src={url}
         alt={photo.place || "Foto"}
@@ -233,7 +240,7 @@ export default function OrderDetailPage() {
       .map(({ photo }) => photo);
   }, [orderPhotoItems]);
 
-  const printOrderPhotos = useMemo(() => {
+ /*  const printOrderPhotos = useMemo(() => {
     const seen = new Set<string>();
     return orderPhotoItems
       .filter(({ item }) => !!item.format)
@@ -243,10 +250,19 @@ export default function OrderDetailPage() {
         return true;
       })
       .map(({ photo }) => photo);
+  }, [orderPhotoItems]); */
+
+  const printOrderPhotos = useMemo(() => {
+    return orderPhotoItems
+      .filter(({ item }) => !!item.format)
+      .map(({ item, photo }) => ({
+        photo,
+        format: item.format ?? null,
+      }));
   }, [orderPhotoItems]);
 
   const handleDownloadMultiple = async (
-    photosToDownload: Photo[],
+    photosToDownload: { photo: Photo, format?: string | null }[],
     emptyMessage: string
   ) => {
     if (!photosToDownload.length) {
@@ -258,9 +274,10 @@ export default function OrderDetailPage() {
     setIsDownloading(true)
   
     try {
-      for (const photo of photosToDownload) {
+      for (const { photo, format } of photosToDownload) {
         const presignedUrl = await fetchPresignedUrl(photo)
-        await triggerFileDownload(presignedUrl, buildPhotoFilename(photo))
+        await triggerFileDownload(presignedUrl, buildPhotoFilename(photo, format))
+        await new Promise((r) => setTimeout(r, 300));
       }
   
       toast({
@@ -341,11 +358,11 @@ export default function OrderDetailPage() {
 
 
   const handleDownloadDigitalPhotos = async () => {
-    await handleDownloadMultiple(digitalOrderPhotos, "No hay fotos digitales para descargar");
+    await handleDownloadMultiple(digitalOrderPhotos.map(photo => ({ photo, format: null })), "No hay fotos digitales para descargar");
   };
 
   const handleDownloadPrintPhotos = async () => {
-    await handleDownloadMultiple(printOrderPhotos, "No hay fotos para imprimir");
+    await handleDownloadMultiple(printOrderPhotos.map(({ photo, format }) => ({ photo, format })), "No hay fotos para imprimir");
   };
 
   const getStatusBadge = (status: Order["order_status"] | undefined) => {
@@ -496,7 +513,7 @@ export default function OrderDetailPage() {
                     setConfirmCount(digitalOrderPhotos.length)
                     setConfirmAction(() => () =>
                       handleDownloadMultiple(
-                        digitalOrderPhotos,
+                        digitalOrderPhotos.map(photo => ({ photo, format: null })),
                         "No hay fotos digitales para descargar"
                       )
                     )
@@ -554,8 +571,14 @@ export default function OrderDetailPage() {
                         </p>
                       </div>
                       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-                        {printOrderPhotos.map((photo) => (
-                          <PhotoGridItem key={photo.id} photo={photo} canDownload={canDownload} isDownloading={isDownloading}/>
+                      {printOrderPhotos.map(({ photo, format }, index) => (
+                          <PhotoGridItem
+                            key={`${photo.id}-${index}`}
+                            photo={photo}
+                            format={format}
+                            canDownload={canDownload}
+                            isDownloading={isDownloading}
+                          />
                         ))}
                       </div>
                     </div>

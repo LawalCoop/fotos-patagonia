@@ -6,7 +6,7 @@ import type { PrintFormat, PrintFormatId } from "./types"
 export const PRINT_FORMATS: PrintFormat[] = [
   {
     id: "polaroid-large",
-    name: "Polaroid",
+    name: "Polaroid 10x12",
     size: "10x12 cm",
     price: 1250,
     description: "Seleccionar 2 fotos",
@@ -15,7 +15,7 @@ export const PRINT_FORMATS: PrintFormat[] = [
   },
   {
     id: "polaroid-small",
-    name: "Polaroid Mini",
+    name: "Polaroid Mini 6x9",
     size: "6x9 cm",
     price: 833.33,
     description: "Seleccionar 6 fotos",
