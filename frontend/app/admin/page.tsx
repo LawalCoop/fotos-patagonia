@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -8,7 +8,6 @@ import {
   Camera,
   TrendingUp,
   ArrowRight,
-  User as UserIcon,
 } from "lucide-react";
 import {
   Card,
@@ -17,6 +16,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import type { Order } from "@/lib/types";
+import { isAdmin } from "@/lib/types";
+import { useAuthStore } from "@/lib/store";
+import { useOrders } from "@/hooks/orders/useOrders";
+import { PhotographerDashboard } from "@/components/organisms/PhotographerDashboard";
+import { RecentSessions } from "@/components/organisms/RecentSessions";
+import { useAdminDashboard } from "@/hooks/stats/useAdminDashboard";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -24,27 +32,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import type { Order, PhotographerEarningsSummary } from "@/lib/types";
-import { getUserRoleName, isAdmin } from "@/lib/types";
-import { usePhotos } from "@/hooks/photos/usePhotos";
-import { useAuthStore } from "@/lib/store";
 import { usePhotographers } from "@/hooks/photographers/usePhotographers";
-import { useEarningsSummaryAll } from "@/hooks/earnings/useEarningsSummaryAll";
-import { useOrders } from "@/hooks/orders/useOrders";
-import { PhotographerDashboard } from "@/components/organisms/PhotographerDashboard";
-import { RecentSessions } from "@/components/organisms/RecentSessions";
 
 export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
-  const { photos, loading: photosLoading, refetch: refetchPhotos } = usePhotos();
-  const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useOrders();
-  const { photographers, loading: photographersLoading } = usePhotographers();
 
-  useEffect(() => {
-    refetchPhotos();
-    refetchOrders();
-  }, [refetchPhotos, refetchOrders]);
+  // --- FILTERS STATE ---
+  const [startDateInput, setStartDateInput] = useState<string>("");
+  const [endDateInput, setEndDateInput] = useState<string>("");
+  const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>("");
+
+  const [appliedFilters, setAppliedFilters] = useState({
+    startDate: "",
+    endDate: "",
+    photographerId: "",
+  });
+
+  const { data: dashboardData, loading: dashboardLoading } = useAdminDashboard(appliedFilters);
+
+  const orderFilters = useMemo(() => {
+    const filters: any = { limit: 5 };
+    if (appliedFilters.startDate) {
+      filters.start_date = appliedFilters.startDate;
+    }
+    if (appliedFilters.endDate) {
+      filters.end_date = appliedFilters.endDate;
+    }
+    if (appliedFilters.photographerId) {
+      filters.photographer_id = appliedFilters.photographerId;
+    }
+    return filters;
+  }, [appliedFilters]);
+
+  const { data: ordersData, loading: ordersLoading } = useOrders(orderFilters);
+  const { photographers, loading: photographersLoading } = usePhotographers();
 
   const photographerId = useMemo(
     () => user?.photographer?.id ?? user?.photographer_id ?? null,
@@ -56,129 +77,27 @@ export default function AdminDashboard() {
     [ordersData]
   );
 
-  const roleName = getUserRoleName(user)?.toLowerCase();
   const userIsAdmin = isAdmin(user);
-
-  // --- FILTERS STATE ---
-  const [startDateInput, setStartDateInput] = useState<string>("");
-  const [endDateInput, setEndDateInput] = useState<string>("");
-  const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>("");
-
-  const [appliedStartDate, setAppliedStartDate] = useState<string | undefined>(undefined);
-  const [appliedEndDate, setAppliedEndDate] = useState<string | undefined>(undefined);
-  const [appliedPhotographerId, setAppliedPhotographerId] = useState<string>("");
-
-  // --- DATA FETCHING ---
-  const { data: earningsAll, loading: earningsAllLoading } = useEarningsSummaryAll(
-    appliedStartDate,
-    appliedEndDate,
-    { enabled: userIsAdmin && !appliedPhotographerId }
-  );
-
-  const { getPhotographerEarningsSummary } = usePhotographers();
-  const [
-    photographerSummary,
-    setPhotographerSummary,
-  ] = useState<PhotographerEarningsSummary | null>(null);
-  const [photographerSummaryLoading, setPhotographerSummaryLoading] = useState(false);
-
-  // --- LOGIC ---
+  
   const handleApplyFilters = () => {
-    setAppliedStartDate(startDateInput || undefined);
-    setAppliedEndDate(endDateInput || undefined);
-    setAppliedPhotographerId(selectedPhotographerId === "all" ? "" : selectedPhotographerId);
+    setAppliedFilters({
+      startDate: startDateInput,
+      endDate: endDateInput,
+      photographerId: selectedPhotographerId === "all" ? "" : selectedPhotographerId,
+    });
   };
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      if (appliedPhotographerId && userIsAdmin) {
-        setPhotographerSummaryLoading(true);
-        try {
-          const summary = await getPhotographerEarningsSummary(
-            parseInt(appliedPhotographerId, 10),
-            {
-              startDate: appliedStartDate,
-              endDate: appliedEndDate,
-            }
-          );
-          setPhotographerSummary(summary);
-        } catch (error) {
-          console.error("Error fetching photographer summary:", error);
-          setPhotographerSummary(null);
-        } finally {
-          setPhotographerSummaryLoading(false);
-        }
-      } else {
-        setPhotographerSummary(null);
-      }
-    };
-
-    fetchSummary();
-  }, [
-    appliedPhotographerId,
-    appliedStartDate,
-    appliedEndDate,
-    userIsAdmin,
-    getPhotographerEarningsSummary,
-  ]);
-  
-  const filteredOrders = useMemo(() => {
-    if (ordersLoading) return [];
-    if (!userIsAdmin) return []; // Simplified for admin view
-
-    if (!appliedPhotographerId) return orders;
-
-    const phId = parseInt(appliedPhotographerId, 10);
-    return orders.filter(order => 
-      order.items?.some(item => item.photo?.photographer_id === phId)
-    );
-  }, [orders, ordersLoading, userIsAdmin, appliedPhotographerId]);
-
   const stats = useMemo(() => {
-    if (ordersLoading || photosLoading)
-      return { totalOrders: 0, pendingOrders: 0, totalPhotos: 0, totalRevenue: 0 };
-    
-    const phId = appliedPhotographerId ? parseInt(appliedPhotographerId, 10) : null;
-
-    const currentOrders = phId
-      ? orders.filter(o => o.items?.some(item => item.photo?.photographer_id === phId))
-      : orders;
-
-    const ordersByPaymentMethod = currentOrders.reduce((acc, order) => {
-      const paymentMethod = order.payment_method || "desconocido";
-      if (!acc[paymentMethod]) {
-        acc[paymentMethod] = 0;
-      }
-      acc[paymentMethod]++;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const totalPhotos = phId
-      ? photos.filter((p) => p.photographer_id === phId).length
-      : photos.length;
-
-    let totalRevenue = 0;
-    if (phId) {
-      totalRevenue = photographerSummary?.total_earnings ?? 0;
-    } else {
-      totalRevenue = earningsAll?.reduce((sum, r) => sum + r.total_earnings, 0) || 0;
+    if (!dashboardData) {
+      return { totalOrders: 0, totalPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
     }
-    
     return {
-      totalOrders: currentOrders.length,
-      ordersByPaymentMethod,
-      totalPhotos,
-      totalRevenue,
+      totalOrders: dashboardData.total_orders,
+      totalPhotos: dashboardData.total_photos,
+      totalRevenue: dashboardData.total_gross_revenue,
+      ordersByPaymentMethod: dashboardData.orders_by_payment_method,
     };
-  }, [
-    orders,
-    photos,
-    photosLoading,
-    ordersLoading,
-    appliedPhotographerId,
-    photographerSummary,
-    earningsAll,
-  ]);
+  }, [dashboardData]);
 
   const isPhotographer = !userIsAdmin && !!photographerId;
 
@@ -186,7 +105,29 @@ export default function AdminDashboard() {
     return <PhotographerDashboard photographerId={photographerId} />;
   }
   
-  const isLoading = earningsAllLoading || photographerSummaryLoading;
+  const isLoading = dashboardLoading;
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="h-4 w-1/2 mt-2" />
+        </div>
+        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -196,7 +137,7 @@ export default function AdminDashboard() {
           Gestiona pedidos, fotos y contenido de Fotos Patagonia
         </p>
       </div>
-      
+
       <div className="mb-6 flex flex-wrap gap-4 items-end">
         <div>
           <label className="block text-sm font-medium mb-1">Fecha desde</label>
@@ -240,7 +181,7 @@ export default function AdminDashboard() {
           {isLoading ? "Cargando..." : "Aplicar"}
         </Button>
       </div>
-
+      
       <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -268,13 +209,16 @@ export default function AdminDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {stats.ordersByPaymentMethod &&
+            {stats.ordersByPaymentMethod && Object.keys(stats.ordersByPaymentMethod).length > 0 ? (
               Object.entries(stats.ordersByPaymentMethod).map(([method, count]) => (
                 <div key={method} className="flex justify-between items-center text-sm">
                   <span className="capitalize">{method}</span>
                   <span className="font-bold">{count}</span>
                 </div>
-              ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No hay datos</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -288,7 +232,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="mb-8 grid gap-6 md:grid-cols-2">
+      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Gestión de Pedidos</CardTitle>
@@ -336,18 +280,22 @@ export default function AdminDashboard() {
             <CardTitle>Pedidos Recientes</CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredOrders.slice(0, 5).map((order) => (
-              <div key={order.id} className="flex items-center justify-between mb-2 p-2 border-b">
-                <div>
-                  <p className="font-semibold">Pedido #{order.id}</p>
-                  <p className="text-sm text-muted-foreground">{order.customer_email}</p>
+            {ordersLoading ? (
+              <div>Cargando...</div>
+            ) : (
+              orders.slice(0, 5).map((order) => (
+                <div key={order.id} className="flex items-center justify-between mb-2 p-2 border-b">
+                  <div>
+                    <p className="font-semibold">Pedido #{order.id}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_email}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">${order.total}</p>
+                    <p className="text-sm capitalize">{order.order_status}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">${order.total}</p>
-                  <p className="text-sm capitalize">{order.order_status}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
         <RecentSessions />

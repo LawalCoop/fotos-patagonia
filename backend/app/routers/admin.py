@@ -39,13 +39,20 @@ def get_earnings_report(
 @router.get("/dashboard", response_model=AdminDashboardSchema)
 def get_admin_dashboard(
     db: Session = Depends(get_db),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    photographer_id: int | None = None,
     current_user: User = Depends(PermissionChecker([Permissions.VIEW_ANY_EARNINGS])) # Redundant but explicit
 ):
     """
     Provides a global summary of all platform activity, including sales,
-    orders, and commissions. Restricted to users with sufficient privileges.
+    orders, and commissions, with optional filters. Restricted to users with sufficient privileges.
     """
-    return AdminService(db).get_dashboard_summary()
+    return AdminService(db).get_dashboard_summary(
+        start_date=start_date,
+        end_date=end_date,
+        photographer_id=photographer_id
+    )
 
 @router.get("/dashboard/recent-sessions", response_model=List[RecentSessionInfo])
 def get_recent_sessions_report(

@@ -8,6 +8,7 @@ from models.photo_session import PhotoSession # Importar PhotoSession
 from services.email_service import send_email
 from services.cart import CartService # Importar CartService
 from core.config import settings
+from datetime import date
 
 def process_earnings_for_order_item(db: Session, order_item: OrderItem):
     """
@@ -153,12 +154,31 @@ class OrderService(BaseService):
         return subject, email_body
 
 
-    def list_all_orders(self) -> list[Order]:
-        return self.db.query(Order).options(
+    def list_all_orders(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        photographer_id: int | None = None,
+    ) -> list[Order]:
+        query = self.db.query(Order).options(
             joinedload(Order.user),
-            joinedload(Order.items).joinedload(OrderItem.photo),
+            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.photographer),
+            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.session),
             joinedload(Order.discount)
-        ).all()
+        )
+
+        if start_date:
+            query = query.filter(Order.created_at >= start_date)
+        if end_date:
+            query = query.filter(Order.created_at <= end_date)
+        if photographer_id:
+            query = query.join(OrderItem).join(Photo).filter(Photo.photographer_id == photographer_id)
+
+        query = query.order_by(Order.created_at.desc())
+
+        return query.offset(offset).limit(limit).all()
 
     def list_my_orders(self, user_id: int) -> list[Order]:
         return self.db.query(Order).options(

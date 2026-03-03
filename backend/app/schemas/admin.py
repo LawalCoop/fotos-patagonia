@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Dict
 
 class AdminCommissionSummary(BaseModel):
     """Summary of commissions for a single photographer."""
@@ -10,10 +10,12 @@ class AdminCommissionSummary(BaseModel):
 
 class AdminDashboardSchema(BaseModel):
     """Global summary for the admin dashboard."""
+    total_photos: int
     total_photos_sold: int
     total_orders: int
     total_gross_revenue: float
     total_commissions: float # Sum of all commissions paid out
+    orders_by_payment_method: Dict[str, int] = Field(default_factory=dict)
     commissions_by_photographer: List[AdminCommissionSummary]
 
 class RecentSessionInfo(BaseModel):

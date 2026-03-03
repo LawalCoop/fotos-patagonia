@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, status, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -6,6 +7,7 @@ from services.orders import OrderService
 from models.user import User
 from models.order import OrderUpdateSchema, OrderStatus, PaymentMethod, OrderSchema, PublicOrderSchema
 from core.permissions import Permissions
+from datetime import date
 
 router = APIRouter(
     prefix="/orders",
@@ -15,13 +17,23 @@ router = APIRouter(
 class ResendEmailPayload(BaseModel):
     email: str | None = None
 
-@router.get("/")
+@router.get("/", response_model=List[OrderSchema])
 def list_all_orders(
     db: Session = Depends(get_db),
-    #current_user: User = Depends(PermissionChecker([Permissions.LIST_ALL_ORDERS]))
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    photographer_id: int | None = Query(None),
     current_user: User = Depends(PermissionChecker([Permissions.LIST_ORDERS]))
 ):
-    return OrderService(db).list_all_orders()
+    return OrderService(db).list_all_orders(
+        limit=limit,
+        offset=offset,
+        start_date=start_date,
+        end_date=end_date,
+        photographer_id=photographer_id
+    )
 
 @router.get("/my-orders")
 def list_my_orders(db: Session = Depends(get_db), user: User = Depends(get_current_user)):

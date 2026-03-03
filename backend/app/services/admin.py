@@ -9,51 +9,99 @@ from schemas.admin import AdminDashboardSchema, AdminCommissionSummary, RecentSe
 from schemas.statistics import PhotoSaleStat
 from typing import List
 
+from sqlalchemy.orm import Session
+from sqlalchemy import func, case
+from services.base import BaseService
+from models.order import Order, OrderItem, PaymentStatus
+from models.photo import Photo
+from models.photographer import Photographer
+from models.earning import Earning
+from schemas.admin import AdminDashboardSchema, AdminCommissionSummary, RecentSessionInfo
+from schemas.statistics import PhotoSaleStat
+from typing import List, Optional
+from datetime import date
+
 class AdminService(BaseService):
-    def get_dashboard_summary(self) -> AdminDashboardSchema:
+    def get_dashboard_summary(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        photographer_id: Optional[int] = None,
+    ) -> AdminDashboardSchema:
         """
-        Calculates and returns a global summary for the admin dashboard.
+        Calculates and returns a global summary for the admin dashboard,
+        with optional filters for date range and photographer.
         """
         db = self.db
 
-        # --- 1. Global Stats ---
-        # Query on paid orders only
-        global_stats_query = db.query(
-            func.count(Order.id).label("total_orders"),
-            func.sum(Order.total).label("total_gross_revenue"),
-            func.sum(OrderItem.quantity).label("total_photos_sold")
-        ).join(OrderItem, Order.id == OrderItem.order_id)\
-         .filter(Order.payment_status == PaymentStatus.PAID)
+        # --- Base Query for Orders ---
+        # This will be the foundation for most stats.
+        orders_query = db.query(Order).filter(Order.payment_status == PaymentStatus.PAID)
+        if start_date:
+            orders_query = orders_query.filter(Order.created_at >= start_date)
+        if end_date:
+            orders_query = orders_query.filter(Order.created_at <= end_date)
         
-        global_stats = global_stats_query.first()
+        if photographer_id:
+            orders_query = orders_query.join(OrderItem).join(Photo).filter(Photo.photographer_id == photographer_id)
 
-        # --- 2. Per-Photographer Stats ---
-        # To get gross sales and commissions, we join several tables.
-        # We calculate gross sales from OrderItems and net earnings from Earnings.
-        # Commission = Gross Sales - Net Earnings.
+        orders_subquery = orders_query.distinct(Order.id).subquery()
+
+        # --- 1. Global Stats ---
+        global_stats_query = db.query(
+            func.count(orders_subquery.c.id).label("total_orders"),
+            func.sum(orders_subquery.c.total).label("total_gross_revenue"),
+        )
+        global_stats = global_stats_query.first()
         
-        # Subquery to get gross sales per photographer
-        gross_sales_subquery = db.query(
+        order_items_query = db.query(func.sum(OrderItem.quantity))\
+            .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)
+        total_photos_sold = order_items_query.scalar()
+
+        # --- Orders by Payment Method ---
+        payment_method_query = db.query(
+            orders_subquery.c.payment_method,
+            func.count(orders_subquery.c.id).label("count")
+        ).group_by(orders_subquery.c.payment_method)
+        
+        orders_by_payment_method = {
+            method: count for method, count in payment_method_query.all() if method
+        }
+
+        # --- Total Photos in the system (conditionally affected by photographer filter) ---
+        photos_query = db.query(func.count(Photo.id))
+        if photographer_id:
+            photos_query = photos_query.filter(Photo.photographer_id == photographer_id)
+        total_photos = photos_query.scalar()
+
+        # --- 2. Per-Photographer Stats (affected by filters) ---
+        gross_sales_query = db.query(
             Photographer.id.label("photographer_id"),
             func.sum(OrderItem.price * OrderItem.quantity).label("gross_sales")
         ).join(Photo, Photographer.id == Photo.photographer_id)\
          .join(OrderItem, Photo.id == OrderItem.photo_id)\
-         .join(Order, OrderItem.order_id == Order.id)\
-         .filter(Order.payment_status == PaymentStatus.PAID)\
-         .group_by(Photographer.id)\
-         .subquery()
+         .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)\
+         .group_by(Photographer.id)
 
-        # Subquery to get net earnings per photographer
-        net_earnings_subquery = db.query(
+        if photographer_id:
+            gross_sales_query = gross_sales_query.filter(Photographer.id == photographer_id)
+        gross_sales_subquery = gross_sales_query.subquery()
+        
+        net_earnings_query = db.query(
             Earning.photographer_id.label("photographer_id"),
             func.sum(Earning.amount).label("net_earnings")
-        ).group_by(Earning.photographer_id)\
-         .subquery()
+        ).join(orders_subquery, Earning.order_id == orders_subquery.c.id)\
+         .group_by(Earning.photographer_id)
+
+        if photographer_id:
+            net_earnings_query = net_earnings_query.filter(Earning.photographer_id == photographer_id)
+        net_earnings_subquery = net_earnings_query.subquery()
         
-        # Main query to combine the data
-        commission_summary_query = db.query(
-            Photographer.id,
-            Photographer.name,
+        photographers_query = db.query(Photographer)
+        if photographer_id:
+            photographers_query = photographers_query.filter(Photographer.id == photographer_id)
+        
+        commission_summary_query = photographers_query.add_columns(
             gross_sales_subquery.c.gross_sales,
             net_earnings_subquery.c.net_earnings
         ).outerjoin(gross_sales_subquery, Photographer.id == gross_sales_subquery.c.photographer_id)\
@@ -64,7 +112,7 @@ class AdminService(BaseService):
 
         commissions_by_photographer: List[AdminCommissionSummary] = []
         total_commissions = 0.0
-        for p_id, p_name, gross, net in photographer_stats:
+        for p_record, gross, net in photographer_stats:
             gross_sales = gross or 0
             net_earnings = net or 0
             commission = gross_sales - net_earnings
@@ -72,8 +120,8 @@ class AdminService(BaseService):
             
             commissions_by_photographer.append(
                 AdminCommissionSummary(
-                    photographer_id=p_id,
-                    photographer_name=p_name,
+                    photographer_id=p_record.id,
+                    photographer_name=p_record.name,
                     total_commission=round(commission, 2),
                     total_gross_sales=round(gross_sales, 2)
                 )
@@ -81,11 +129,13 @@ class AdminService(BaseService):
 
         # --- 3. Assemble final schema ---
         return AdminDashboardSchema(
-            total_photos_sold=global_stats.total_photos_sold or 0,
+            total_photos=total_photos or 0,
+            total_photos_sold=total_photos_sold or 0,
             total_orders=global_stats.total_orders or 0,
             total_gross_revenue=round(global_stats.total_gross_revenue or 0, 2),
             total_commissions=round(total_commissions, 2),
-            commissions_by_photographer=commissions_by_photographer
+            orders_by_payment_method=orders_by_payment_method,
+            commissions_by_photographer=commissions_by_photographer,
         )
 
     def get_recent_sessions(self) -> List[RecentSessionInfo]:
