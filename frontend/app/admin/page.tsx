@@ -288,6 +288,19 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader>
+            <CardTitle>Gestión de Fotos</CardTitle>
+            <CardDescription>Administrar catálogo de fotos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/fotos">
+              <Button className="w-full">
+                Ver Fotos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
             <CardDescription>Administrar álbumes, fotógrafos, tags y códigos</CardDescription>
           </CardHeader>
