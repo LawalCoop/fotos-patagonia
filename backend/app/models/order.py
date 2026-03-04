@@ -41,7 +41,7 @@ class OrderItemCreateSchema(OrderItemBaseSchema):
 
 class OrderItemSchema(OrderItemBaseSchema):
     id: int
-    photo: PhotoSchema
+    photo: Optional[PhotoSchema] = None
     format: Optional[str] = None
 
     class Config:
@@ -49,7 +49,7 @@ class OrderItemSchema(OrderItemBaseSchema):
 
 class PublicOrderItemSchema(OrderItemBaseSchema):
     id: int
-    photo: PublicPhotoSchema
+    photo: Optional[PublicPhotoSchema] = None
     format: Optional[str] = None
 
     class Config:
