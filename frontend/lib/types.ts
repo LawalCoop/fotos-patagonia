@@ -387,3 +387,20 @@ export interface AlbumDetail {
   tags?: any[]
   combos?: any[]
 }
+
+export interface AdminCommissionSummary {
+  photographer_id: number;
+  photographer_name: string;
+  total_commission: number;
+  total_gross_sales: number;
+}
+
+export interface AdminDashboardSchema {
+  total_photos: number;
+  total_photos_sold: number;
+  total_orders: number;
+  total_gross_revenue: number;
+  total_commissions: number;
+  orders_by_payment_method: Record<string, number>;
+  commissions_by_photographer: AdminCommissionSummary[];
+}
