@@ -58,6 +58,11 @@ class AdminService(BaseService):
             .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)
         total_photos_sold = order_items_query.scalar()
 
+        # --- Total Real Photos Sold ---
+        real_photos_sold_query = db.query(func.sum(Earning.real_photos_sold))\
+            .join(orders_subquery, Earning.order_id == orders_subquery.c.id)
+        total_real_photos_sold = real_photos_sold_query.scalar() or 0.0
+
         # --- Orders by Payment Method ---
         payment_method_query = db.query(
             orders_subquery.c.payment_method,
@@ -131,6 +136,7 @@ class AdminService(BaseService):
         return AdminDashboardSchema(
             total_photos=total_photos or 0,
             total_photos_sold=total_photos_sold or 0,
+            total_real_photos_sold=round(total_real_photos_sold, 2),
             total_orders=global_stats.total_orders or 0,
             total_gross_revenue=round(global_stats.total_gross_revenue or 0, 2),
             total_commissions=round(total_commissions, 2),

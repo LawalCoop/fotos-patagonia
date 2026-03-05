@@ -14,6 +14,7 @@ class EarningSchema(BaseModel):
     amount: float
     commission_applied: float
     earned_photo_fraction: float # Nuevo campo
+    real_photos_sold: float = 0.0 # Fotos reales vendidas calculadas
     created_at: datetime
     photo_filename: str | None = None
 
@@ -31,6 +32,7 @@ class Earning(Base):
     amount = Column(Float, nullable=False)
     commission_applied = Column(Float, nullable=False) # Porcentaje de comisión usado
     earned_photo_fraction = Column(Float, nullable=False) # Nuevo campo
+    real_photos_sold = Column(Float, nullable=False, default=0.0) # Fotos reales vendidas
     created_at = Column(DateTime, default=datetime.utcnow)
 
     photographer = relationship("Photographer", back_populates="earnings")

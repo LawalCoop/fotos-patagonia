@@ -57,6 +57,7 @@ class PublicOrderItemSchema(OrderItemBaseSchema):
 
 class OrderBaseSchema(BaseModel):
     customer_email: Optional[str] = None
+    subtotal: float = 0.0
     total: float
     payment_method: PaymentMethod
     payment_status: PaymentStatus = PaymentStatus.PENDING
@@ -71,6 +72,7 @@ class OrderCreateSchema(OrderBaseSchema):
 
 class OrderUpdateSchema(OrderBaseSchema):
     customer_email: Optional[str] = None
+    subtotal: Optional[float] = None
     total: Optional[float] = None
     payment_method: Optional[PaymentMethod] = None
     payment_status: Optional[PaymentStatus] = None
@@ -113,6 +115,7 @@ class Order(Base):
     guest_id = Column(String, nullable=True, index=True)
     customer_email = Column(String(100), nullable=True)
     discount_id = Column(Integer, ForeignKey("discounts.id"), nullable=True)
+    subtotal = Column(Float, nullable=False, default=0.0)
     total = Column(Float, nullable=False)
     payment_method = Column(SQLAlchemyEnum(PaymentMethod), nullable=False)
     payment_status = Column(SQLAlchemyEnum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)

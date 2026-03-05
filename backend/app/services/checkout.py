@@ -179,6 +179,7 @@ class CheckoutService(BaseService):
             user_id=order_in.user_id,
             guest_id=order_in.guest_id,
             customer_email=order_in.customer_email,
+            subtotal=order_in.subtotal,
             total=order_in.total,
             payment_method=order_in.payment_method,
             payment_status=order_in.payment_status,

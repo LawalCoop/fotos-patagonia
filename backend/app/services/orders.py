@@ -37,13 +37,25 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
     item_price = order_item.price * order_item.quantity
     commission_percentage = photographer.commission_percentage
     
+    # Real photos sold calculation (discount/combo ratio)
+    order = order_item.order
+    discount_ratio = 1.0
+    if order and order.subtotal and order.subtotal > 0:
+        discount_ratio = order.total / order.subtotal
+    elif order and order.total == 0:
+        discount_ratio = 0.0
+
+    real_photos_sold = order_item.quantity * discount_ratio
+
+    # Value of this item after applying proportional discounts
+    real_value_of_item = item_price * discount_ratio
+
     # Monetary earning calculation
-    commission_amount = item_price * (commission_percentage / 100.0)
-    earned_amount = item_price - commission_amount
+    # commission_percentage now represents the photographer's share
+    earned_amount = real_value_of_item * (commission_percentage / 100.0)
 
     # Photo fraction earning calculation
-    photographer_fraction = 1 - (commission_percentage / 100.0)
-    earned_photo_fraction = photographer_fraction * order_item.quantity
+    earned_photo_fraction = real_photos_sold * (commission_percentage / 100.0)
 
     new_earning = Earning(
         photographer_id=photographer.id,
@@ -51,7 +63,8 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
         order_item_id=order_item.id,
         amount=earned_amount,
         commission_applied=commission_percentage,
-        earned_photo_fraction=earned_photo_fraction
+        earned_photo_fraction=earned_photo_fraction,
+        real_photos_sold=real_photos_sold
     )
     db.add(new_earning)
     # No commit here, as it should be part of a larger transaction

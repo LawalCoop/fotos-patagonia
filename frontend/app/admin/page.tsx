@@ -94,27 +94,29 @@ export default function AdminDashboard() {
     return {
       totalOrders: dashboardData.total_orders,
       totalPhotos: dashboardData.total_photos,
+      totalRealPhotos: dashboardData.total_real_photos_sold,
       totalRevenue: dashboardData.total_gross_revenue,
       ordersByPaymentMethod: dashboardData.orders_by_payment_method,
     };
-  }, [dashboardData]);
+    }, [dashboardData]);
 
-  const isPhotographer = !userIsAdmin && !!photographerId;
+    const isPhotographer = !userIsAdmin && !!photographerId;
 
-  if (isPhotographer && photographerId) {
+    if (isPhotographer && photographerId) {
     return <PhotographerDashboard photographerId={photographerId} />;
-  }
-  
-  const isLoading = dashboardLoading;
+    }
 
-  if (isLoading) {
+    const isLoading = dashboardLoading;
+
+    if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <Skeleton className="h-10 w-3/4" />
           <Skeleton className="h-4 w-1/2 mt-2" />
         </div>
-        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+          <Skeleton className="h-28" />
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
@@ -127,9 +129,9 @@ export default function AdminDashboard() {
         </div>
       </div>
     );
-  }
+    }
 
-  return (
+    return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold">Panel de Administración</h1>
@@ -181,8 +183,8 @@ export default function AdminDashboard() {
           {isLoading ? "Cargando..." : "Aplicar"}
         </Button>
       </div>
-      
-      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+
+      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
@@ -194,13 +196,30 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Fotos Totales Vendidas</CardTitle>
+            <Camera className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalPhotos}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Fotos Reales Vendidas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{stats.totalRealPhotos.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Ajustado por combos/desc.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              ${stats.totalRevenue.toLocaleString()}
-            </div>
+            <div className="text-3xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
