@@ -399,6 +399,7 @@ export interface AdminCommissionSummary {
 export interface AdminDashboardSchema {
   total_photos: number;
   total_photos_sold: number;
+  total_real_photos_sold: number;
   total_orders: number;
   total_gross_revenue: number;
   total_commissions: number;
