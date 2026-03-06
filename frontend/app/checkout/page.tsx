@@ -87,6 +87,7 @@ export default function CheckoutPage() {
     printsSubtotalEffective,
     digitalSubtotalEffective,
     totalEffective,
+    subtotal,
   
     // 🧠 flags de edición
     printsManualEnabled,
@@ -278,10 +279,10 @@ export default function CheckoutPage() {
   // Payload para backend (ajustado al esquema real)
   const orderPayload = {
     customer_email: email,
-    total: effectiveTotal, 
+    subtotal: subtotal,
+    total: effectiveTotal,
     payment_method: paymentMethod,
-    payment_status: "pending",
-    order_status: "pending",
+    payment_status: "pending",    order_status: "pending",
     external_payment_id: null,
     user_id: isAuthenticated ? user?.id ?? null : null,
     discount_id: null,

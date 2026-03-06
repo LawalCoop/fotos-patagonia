@@ -303,7 +303,7 @@ export const useCartStore = create<CartStore>()(
             discountCode: discount.code,
             discountInfo: nextDiscountInfo,
             // Mantener el contrato: subtotal/totalEffective = pre-descuento
-            subtotal: totalEffective,
+            subtotal: state.subtotal,
             // No recalcular subtotales aquí; updateTotals es la fuente de verdad para eso.
             total,
           }
@@ -372,7 +372,7 @@ export const useCartStore = create<CartStore>()(
             printsManualEnabled: true,
             printsSubtotalManual: printsManual,
             printsSubtotalEffective: printsManual,
-            subtotal: totalEffective,
+            subtotal: state.subtotal,
             totalEffective,
             total,
           }
@@ -389,7 +389,7 @@ export const useCartStore = create<CartStore>()(
             digitalManualEnabled: true,
             digitalSubtotalManual: digitalManual,
             digitalSubtotalEffective: digitalManual,
-            subtotal: totalEffective,
+            subtotal: state.subtotal,
             totalEffective,
             total,
           }
@@ -406,7 +406,7 @@ export const useCartStore = create<CartStore>()(
             printsManualEnabled: false,
             printsSubtotalManual: undefined,
             printsSubtotalEffective: printsEffective,
-            subtotal: totalEffective,
+            subtotal: state.subtotal,
             totalEffective,
             total,
           }
@@ -423,7 +423,7 @@ export const useCartStore = create<CartStore>()(
             digitalManualEnabled: false,
             digitalSubtotalManual: undefined,
             digitalSubtotalEffective: digitalEffective,
-            subtotal: totalEffective,
+            subtotal: state.subtotal,
             totalEffective,
             total,
           }
@@ -484,6 +484,7 @@ export const useCartStore = create<CartStore>()(
           : digitalCalculated
 
         const totalEffective = printsEffective + digitalEffective
+        const nominalSubtotal = digitalBase + printsCalculated
         const total = computeDiscountedTotal(totalEffective, discountInfo)
 
         set({
@@ -491,7 +492,7 @@ export const useCartStore = create<CartStore>()(
           printsSubtotalEffective: printsEffective,
           digitalSubtotalCalculated: digitalCalculated,
           digitalSubtotalEffective: digitalEffective,
-          subtotal: totalEffective,
+          subtotal: nominalSubtotal,
           totalEffective,
           total,
         })

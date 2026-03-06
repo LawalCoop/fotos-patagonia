@@ -43,7 +43,8 @@ export function PhotoEarningsSummaryTable({ photographerId }: PhotoEarningsSumma
           <TableHeader>
             <TableRow>
               <TableHead>Foto</TableHead>
-              <TableHead className="text-center">Veces Vendida</TableHead>
+              <TableHead className="text-center">Ventas Nominales</TableHead>
+              <TableHead className="text-center">Ventas Reales</TableHead>
               <TableHead className="text-right">Ganancia Total</TableHead>
             </TableRow>
           </TableHeader>
@@ -52,6 +53,9 @@ export function PhotoEarningsSummaryTable({ photographerId }: PhotoEarningsSumma
               <TableRow key={item.photo_id}>
                 <TableCell className="font-medium">{item.photo_filename}</TableCell>
                 <TableCell className="text-center">{item.times_sold}</TableCell>
+                <TableCell className="text-center font-semibold text-primary">
+                  {item.real_photos_sold.toFixed(1)}
+                </TableCell>
                 <TableCell className="text-right font-medium">${item.total_earnings.toFixed(2)}</TableCell>
               </TableRow>
             ))}

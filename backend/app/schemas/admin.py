@@ -12,6 +12,7 @@ class AdminDashboardSchema(BaseModel):
     """Global summary for the admin dashboard."""
     total_photos: int
     total_photos_sold: int
+    total_real_photos_sold: float
     total_orders: int
     total_gross_revenue: float
     total_commissions: float # Sum of all commissions paid out

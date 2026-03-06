@@ -21,11 +21,13 @@ class PhotoSaleDetailSchema(BaseModel):
     photo_url: str
     album_name: str
     times_sold: int
+    real_photos_sold: float
     total_earnings: float
 
 class EarningsSummarySchema(BaseModel):
     total_earnings: float
     total_earned_photo_fraction: float
+    total_real_photos_sold: float
     total_orders_involved: int
     total_photos_sold: int
     photographer_id: int
@@ -197,6 +199,7 @@ class PhotographerService(BaseService):
             Photo.id.label("photo_id"),
             Photo.filename.label("photo_filename"),
             func.sum(OrderItem.quantity).label("times_sold"),
+            func.sum(Earning.real_photos_sold).label("real_photos_sold"),
             func.sum(Earning.amount).label("total_earnings")
         ).select_from(Earning)\
          .join(Earning.order_item)\
@@ -208,6 +211,59 @@ class PhotographerService(BaseService):
         results = summary_query.order_by(func.sum(Earning.amount).desc()).offset(skip).limit(limit).all()
 
         return PaginatedResponse(total=total, items=results)
+
+    def get_earnings_summary_by_order(self, photographer_id: int, current_user: User, skip: int = 0, limit: int = 15, start_date: date | None = None, end_date: date | None = None):
+        """
+        Returns a paginated summary of earnings grouped by order.
+        """
+        self._check_earnings_permission(photographer_id, current_user)
+
+        summary_query = self.db.query(
+            Earning.order_id,
+            func.min(Earning.created_at).label("created_at"),
+            func.sum(OrderItem.quantity).label("total_photos"),
+            func.sum(Earning.real_photos_sold).label("real_photos_sold"),
+            func.sum(Earning.amount).label("total_earnings")
+        ).select_from(Earning)\
+         .join(Earning.order_item)\
+         .filter(Earning.photographer_id == photographer_id)\
+         .group_by(Earning.order_id)
+         
+        if start_date:
+            summary_query = summary_query.filter(Earning.created_at >= start_date)
+        if end_date:
+            summary_query = summary_query.filter(Earning.created_at < end_date + timedelta(days=1))
+
+        total = summary_query.count()
+        results = summary_query.order_by(func.min(Earning.created_at).desc()).offset(skip).limit(limit).all()
+        
+        # Now fetch total photos for these orders to calculate percentage
+        order_ids = [r.order_id for r in results]
+        order_totals = {}
+        if order_ids:
+            totals_query = self.db.query(
+                OrderItem.order_id,
+                func.sum(OrderItem.quantity).label("order_total_photos")
+            ).filter(OrderItem.order_id.in_(order_ids)).group_by(OrderItem.order_id).all()
+            for t in totals_query:
+                order_totals[t.order_id] = t.order_total_photos
+
+        from schemas.photographer import OrderEarningSummary
+        result_schemas = []
+        for r in results:
+            order_total_photos = order_totals.get(r.order_id, 0)
+            percentage_in_order = 0.0
+            if order_total_photos > 0:
+                percentage_in_order = (r.total_photos / order_total_photos) * 100
+                
+            # Create a dict from the result row, then update it
+            schema_data = r._asdict() if hasattr(r, '_asdict') else dict(zip(r._fields, r))
+            schema_data["order_total_photos"] = order_total_photos
+            schema_data["percentage_in_order"] = percentage_in_order
+            
+            result_schemas.append(OrderEarningSummary(**schema_data))
+
+        return PaginatedResponse(total=total, items=result_schemas)
 
     def get_photographer_earnings_summary(
         self,
@@ -236,6 +292,7 @@ class PhotographerService(BaseService):
         summary_query = self.db.query(
             func.sum(earnings_subquery.c.amount).label("total_amount"),
             func.sum(earnings_subquery.c.earned_photo_fraction).label("total_earned_photo_fraction"),
+            func.sum(earnings_subquery.c.real_photos_sold).label("total_real_photos_sold"),
             func.count(earnings_subquery.c.order_id.distinct()).label("total_orders_involved")
         )
         summary = summary_query.first()
@@ -251,6 +308,7 @@ class PhotographerService(BaseService):
             Photo.object_name.label("photo_object_name"),
             PhotoSession.event_name.label("album_name"),
             func.sum(OrderItem.quantity).label("times_sold"),
+            func.sum(earnings_subquery.c.real_photos_sold).label("real_photos_sold"),
             func.sum(earnings_subquery.c.amount).label("total_earnings")
         ).join(earnings_subquery, OrderItem.id == earnings_subquery.c.order_item_id)\
          .join(Photo, OrderItem.photo_id == Photo.id)\
@@ -263,6 +321,7 @@ class PhotographerService(BaseService):
         return EarningsSummarySchema(
             total_earnings=summary.total_amount or 0,
             total_earned_photo_fraction=summary.total_earned_photo_fraction or 0,
+            total_real_photos_sold=summary.total_real_photos_sold or 0,
             total_orders_involved=summary.total_orders_involved or 0,
             total_photos_sold=total_photos_sold,
             photographer_id=photographer_id,
@@ -274,6 +333,7 @@ class PhotographerService(BaseService):
                     photo_url=item.photo_object_name,
                     album_name=item.album_name,
                     times_sold=item.times_sold,
+                    real_photos_sold=item.real_photos_sold,
                     total_earnings=item.total_earnings
                 ) for item in photo_sales_details
             ]

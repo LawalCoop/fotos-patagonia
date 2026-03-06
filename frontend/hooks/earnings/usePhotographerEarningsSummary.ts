@@ -7,6 +7,7 @@ export interface PhotoEarningSummary {
   photo_id: number;
   photo_filename: string;
   times_sold: number;
+  real_photos_sold: number;
   total_earnings: number;
 }
 

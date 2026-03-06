@@ -181,7 +181,6 @@ export enum PaymentMethod {
   POSNET = "posnet",
   MP = "mp",
 }
-
 export interface Order {
   id: string | number;
   // Campos de la API
@@ -190,6 +189,8 @@ export interface Order {
   user_id?: number;
   user?: User;
   customer_email?: string;
+  subtotal?: number;
+  total: number;
   discount_id?: number | null;
   discount?: DiscountCode | null;
   order_status?: OrderStatus;
