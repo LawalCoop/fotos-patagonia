@@ -89,7 +89,7 @@ export default function AdminDashboard() {
 
   const stats = useMemo(() => {
     if (!dashboardData) {
-      return { totalOrders: 0, totalPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
+      return { totalOrders: 0, totalPhotos: 0, totalRealPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
     }
     return {
       totalOrders: dashboardData.total_orders,
