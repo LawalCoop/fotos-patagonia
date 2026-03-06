@@ -14,6 +14,7 @@ import { PhotographerEarningsSummary } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { DateRange } from "react-day-picker";
 
 interface PhotographerDashboardProps {
   photographerId: number;
@@ -22,7 +23,7 @@ interface PhotographerDashboardProps {
 export function PhotographerDashboard({ photographerId }: PhotographerDashboardProps) {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [appliedDateRange, setAppliedDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
+  const [appliedDateRange, setAppliedDateRange] = useState<DateRange | undefined>();
 
   const { earnings, loading, error, page, setPage, total, limit } = usePhotographerEarningsByOrder(
     photographerId,
