@@ -209,7 +209,6 @@ export interface Order {
   editableUntil?: string;
   photos?: string[];
   // Común
-  total: number;
   items?: OrderItem[];
 }
 
