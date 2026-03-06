@@ -81,7 +81,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {(summary as any)?.total_real_photos_sold?.toFixed(1) || "0.0"}
+              {summary?.total_real_photos_sold?.toFixed(1) || "0.0"}
             </div>
             <CardDescription className="text-xs mt-1">Ajustado por descuentos/combos</CardDescription>
           </CardContent>

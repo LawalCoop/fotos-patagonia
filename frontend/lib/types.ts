@@ -306,6 +306,8 @@ export interface Earning {
 export interface PhotographerEarningsSummary {
   total_earnings: number;
   total_earned_photo_fraction: number;
+  total_real_photos_sold: number;
+  total_photos_sold: number;
   total_orders_involved: number;
   photographer_id: number;
   start_date: string | null; // ISO date string or null
