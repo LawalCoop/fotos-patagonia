@@ -121,13 +121,6 @@ export default function PedidosPage() {
       )
     }
 
-    // 🔐 Fotógrafo: solo pedidos del día
-    if (isPhotographer && !userIsAdmin) {
-      filtered = filtered.filter((order) =>
-        isTodayInArgentina(order.created_at ?? order.createdAt)
-      )
-    }
-
     // 💳 pago
     if (paymentFilter !== "all") {
       filtered = filtered.filter(

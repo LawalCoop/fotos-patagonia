@@ -38,6 +38,7 @@ ROLES_PERMISSIONS = {
     "Photographer": [
         Permissions.CREATE_ALBUM.value,
         Permissions.EDIT_OWN_ALBUM.value, # Re-added - Photographers should edit OWN album
+        Permissions.DELETE_OWN_ALBUM.value,
         Permissions.UPLOAD_PHOTO.value,
         Permissions.EDIT_OWN_PHOTO.value,
         Permissions.DELETE_OWN_PHOTO.value,

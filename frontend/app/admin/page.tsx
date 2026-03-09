@@ -89,11 +89,12 @@ export default function AdminDashboard() {
 
   const stats = useMemo(() => {
     if (!dashboardData) {
-      return { totalOrders: 0, totalPhotos: 0, totalRealPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
+      return { totalOrders: 0, totalPhotos: 0, totalPhotosSold: 0, totalRealPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
     }
     return {
       totalOrders: dashboardData.total_orders,
       totalPhotos: dashboardData.total_photos,
+      totalPhotosSold: dashboardData.total_photos_sold,
       totalRealPhotos: dashboardData.total_real_photos_sold,
       totalRevenue: dashboardData.total_gross_revenue,
       ordersByPaymentMethod: dashboardData.orders_by_payment_method,
@@ -200,7 +201,7 @@ export default function AdminDashboard() {
             <Camera className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{stats.totalPhotos}</div>
+            <div className="text-3xl font-bold">{stats.totalPhotosSold}</div>
           </CardContent>
         </Card>
         <Card>
