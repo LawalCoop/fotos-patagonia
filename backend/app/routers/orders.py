@@ -27,12 +27,22 @@ def list_all_orders(
     photographer_id: int | None = Query(None),
     current_user: User = Depends(PermissionChecker([Permissions.LIST_ORDERS]))
 ):
+    # If user is a photographer (and not admin), force their own photographer_id
+    user_permissions = {p.name for p in current_user.role.permissions}
+    is_admin = Permissions.FULL_ACCESS.value in user_permissions
+    
+    final_photographer_id = photographer_id
+    
+    if not is_admin and current_user.photographer:
+        # If it's a photographer, they can only see orders with their photos
+        final_photographer_id = current_user.photographer.id
+
     return OrderService(db).list_all_orders(
         limit=limit,
         offset=offset,
         start_date=start_date,
         end_date=end_date,
-        photographer_id=photographer_id
+        photographer_id=final_photographer_id
     )
 
 @router.get("/my-orders")

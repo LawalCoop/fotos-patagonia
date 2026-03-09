@@ -61,8 +61,24 @@ def complete_upload(
         )
 
 @router.get("/", response_model=List[PhotoSchema])
-def list_photos(offset: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    return PhotoService(db).list_photos(offset=offset, limit=limit)
+def list_photos(
+    offset: int = 0, 
+    limit: int = 10, 
+    photographer_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker([Permissions.LIST_ORDERS], require_all=False)) # Use a common permission or a weak one
+):
+    # If user is a photographer (and not admin), force their own photographer_id
+    user_permissions = {p.name for p in current_user.role.permissions}
+    is_admin = Permissions.FULL_ACCESS.value in user_permissions
+    
+    final_photographer_id = photographer_id
+    
+    if not is_admin and current_user.photographer:
+        # If it's a photographer, they can only see their own photos
+        final_photographer_id = current_user.photographer.id
+    
+    return PhotoService(db).list_photos(offset=offset, limit=limit, photographer_id=final_photographer_id)
 
 class PhotoIdsRequest(BaseModel):
     photo_ids: List[int]

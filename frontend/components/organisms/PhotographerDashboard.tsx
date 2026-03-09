@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { usePhotographerEarningsByOrder } from "@/hooks/earnings/usePhotographerEarningsByOrder";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import Link from "next/link";
 import { formatDateTime } from "@/lib/datetime";
 import { format } from "date-fns";
-import { Terminal, TrendingUp, DollarSign, Camera, Calendar } from "lucide-react";
+import { Terminal, TrendingUp, DollarSign, Camera, Calendar, ArrowRight, Package } from "lucide-react";
 import { PhotoEarningsSummaryTable } from "./PhotoEarningsSummaryTable";
 import { PaginationControls } from "../molecules/PaginationControls";
 import { usePhotographers } from "@/hooks/photographers/usePhotographers";
@@ -95,6 +96,42 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
             <div className="text-2xl font-bold text-green-600">
               ${summary?.total_earnings.toFixed(2) || "0.00"}
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Accesos Rápidos a Gestión */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Gestión de Pedidos
+            </CardTitle>
+            <CardDescription>Ver y administrar tus pedidos recientes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/pedidos">
+              <Button className="w-full" variant="outline">
+                Ver Pedidos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Gestión de Fotos
+            </CardTitle>
+            <CardDescription>Administrar tus fotos, sesiones y álbumes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/fotos">
+              <Button className="w-full" variant="outline">
+                Administrar Fotos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

@@ -5,9 +5,15 @@ from services.base import BaseService
 from models.album import Album
 
 class SessionService(BaseService):
-    def list_sessions(self) -> list[PhotoSession]:
+    def list_sessions(self, photographer_id: int | None = None) -> list[PhotoSession]:
         """Returns a list of all photo sessions with their photographer eagerly loaded."""
-        return self.db.query(PhotoSession).options(joinedload(PhotoSession.photographer), joinedload(PhotoSession.album)).all()
+        query = self.db.query(PhotoSession).options(
+            joinedload(PhotoSession.photographer), 
+            joinedload(PhotoSession.album)
+        )
+        if photographer_id:
+            query = query.filter(PhotoSession.photographer_id == photographer_id)
+        return query.all()
 
     def get_session(self, session_id: int) -> PhotoSession:
         """Returns a specific photo session by its ID with its photographer eagerly loaded."""
