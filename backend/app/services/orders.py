@@ -185,7 +185,8 @@ class OrderService(BaseService):
         if start_date:
             query = query.filter(Order.created_at >= start_date)
         if end_date:
-            query = query.filter(Order.created_at <= end_date)
+            from datetime import timedelta
+            query = query.filter(Order.created_at < end_date + timedelta(days=1))
         if photographer_id:
             query = query.join(OrderItem).join(Photo).filter(Photo.photographer_id == photographer_id)
 
