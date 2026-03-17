@@ -19,8 +19,8 @@ const nextConfig = {
     ],
   },
 
-  // ✅ Reducir superficie futura (si algún dev intenta usar Server Actions)
-  serverActions: false,
+  // Nota: `serverActions` no es una key válida en Next 14.2.x (genera warning).
+  // Si necesitás controlar Server Actions, hacelo vía adopción/uso en el código y/o políticas de repo.
 
   // ✅ Headers de seguridad (básicos y seguros)
   async headers() {

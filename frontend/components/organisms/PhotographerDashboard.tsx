@@ -134,6 +134,19 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
             </Link>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
+            <CardDescription>Administrar álbumes, fotógrafos, tags y códigos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/abm">
+              <Button className="w-full">
+                Gestionar Contenido <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Detalle de Ganancias Individuales (Ancho Completo) */}

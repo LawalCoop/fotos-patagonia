@@ -67,12 +67,24 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - type: bind
+        source: ./frontend
+        target: /app
+      # Mantener dependencias dentro de Docker (evita conflicto con node_modules del host)
+      - frontend_node_modules:/app/node_modules
+      # Mantener .next dentro de Docker (evita corrupción por bind-mount / permisos del host)
+      - frontend_next:/app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - INTERNAL_API_URL=http://backend:8000
+      # Hot reload estable en Docker (especialmente Linux/WSL/volúmenes)
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=true
+      - WATCHPACK_POLLING_INTERVAL=1000
+      - NEXT_TELEMETRY_DISABLED=1
+    # Limpia artefactos viejos dentro del volumen de .next antes de arrancar Next dev
+    # (evita estados parciales que terminan en missing middleware-manifest.json / errores de runtime)
+    command: sh -lc "rm -rf /app/.next/* /app/.next/.[!.]* /app/.next/..?* 2>/dev/null || true; npm run dev -- -H 0.0.0.0 -p 3000"
     depends_on:
       - backend
     networks:
@@ -90,6 +102,8 @@ services:
 volumes:
   postgres_data:
   localstack_data:
+  frontend_node_modules:
+  frontend_next:
 
 networks:
   fotopatagonia_network:
