@@ -19,6 +19,13 @@ class UserUpdateSchema(UserBaseSchema):
     password: Optional[str] = None
     role_id: Optional[int] = None
 
+class ChangePasswordSchema(BaseModel):
+    current_password: str
+    new_password: str
+
+class AdminChangePasswordSchema(BaseModel):
+    new_password: str
+
 class UserInDBBaseSchema(UserBaseSchema):
     id: int
     role: RoleSchema

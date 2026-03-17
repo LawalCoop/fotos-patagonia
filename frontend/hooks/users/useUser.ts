@@ -117,6 +117,19 @@ export function useUsers() {
     }
   };
 
+  const adminChangePassword = async (userId: number, new_password: string): Promise<BackendUser> => {
+    try {
+      const result = await apiFetch<BackendUser>(`/users/${userId}/password`, {
+        method: "PUT",
+        body: JSON.stringify({ new_password }),
+      });
+      return result;
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
@@ -130,5 +143,6 @@ export function useUsers() {
     createUser,
     updateUser,
     deleteUser,
+    adminChangePassword,
   };
 }

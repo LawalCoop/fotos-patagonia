@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Pencil, Trash2, Shield, UserIcon, Loader2, CheckCircle, XCircle } from "lucide-react"
+import { Plus, Pencil, Trash2, Shield, UserIcon, Loader2, CheckCircle, XCircle, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,9 +11,10 @@ import { useRoles } from "@/hooks/roles/useRoles"
 import { useToast } from "@/hooks/use-toast"
 import { UserModal } from "@/components/molecules/user-modal"
 import { DeleteConfirmationModal } from "@/components/molecules/delete-confirmation-modal"
+import { ChangePasswordModal } from "@/components/molecules/change-password-modal"
 
 export default function AdminUsuariosPage() {
-  const { users, loading: usersLoading, error: usersError, refetch, createUser, updateUser, deleteUser } = useUsers()
+  const { users, loading: usersLoading, error: usersError, refetch, createUser, updateUser, deleteUser, adminChangePassword } = useUsers()
   const { roles, loading: rolesLoading } = useRoles()
   const { toast } = useToast()
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -22,6 +23,10 @@ export default function AdminUsuariosPage() {
     isOpen: boolean
     userId: number | null
   }>({ isOpen: false, userId: null })
+  const [passwordModal, setPasswordModal] = useState<{ isOpen: boolean; user: any | null }>({
+    isOpen: false,
+    user: null,
+  })
 
   const handleOpenAdd = () => {
     setEditingUser(undefined)
@@ -35,6 +40,29 @@ export default function AdminUsuariosPage() {
 
   const handleOpenDelete = (userId: number) => {
     setDeleteConfirmation({ isOpen: true, userId })
+  }
+
+  const handleOpenChangePassword = (user: any) => {
+    setPasswordModal({ isOpen: true, user })
+  }
+
+  const handleChangePasswordSave = async (password: string) => {
+    if (!passwordModal.user) return
+    try {
+      await adminChangePassword(passwordModal.user.id, password)
+      toast({
+        title: "Contraseña actualizada",
+        description: `Se actualizó la contraseña para ${passwordModal.user.email}`,
+      })
+      setPasswordModal({ isOpen: false, user: null })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Hubo un problema al cambiar la contraseña",
+        variant: "destructive",
+      })
+      throw error // Re-throw para que el modal maneje el estado de error
+    }
   }
 
   const handleDelete = async (id: number) => {
@@ -205,11 +233,21 @@ export default function AdminUsuariosPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenChangePassword(user)}
+                            className="gap-2 text-blue-500 hover:text-blue-600"
+                            title="Cambiar contraseña"
+                          >
+                            <Lock className="h-4 w-4" />
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => handleOpenEdit(user)} 
                             className="gap-2"
+                            title="Editar usuario"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -219,6 +257,7 @@ export default function AdminUsuariosPage() {
                             onClick={() => handleOpenDelete(user.id)}
                             className="gap-2 text-destructive hover:text-destructive"
                             disabled={user.role.name === "Admin"}
+                            title="Eliminar usuario"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -248,6 +287,13 @@ export default function AdminUsuariosPage() {
         entityName={`el usuario "${userToDelete?.email}"`}
         onConfirm={() => deleteConfirmation.userId && handleDelete(deleteConfirmation.userId)}
         onCancel={() => setDeleteConfirmation({ isOpen: false, userId: null })}
+      />
+
+      <ChangePasswordModal
+        isOpen={passwordModal.isOpen}
+        userEmail={passwordModal.user?.email}
+        onClose={() => setPasswordModal({ isOpen: false, user: null })}
+        onSave={handleChangePasswordSave}
       />
     </div>
   )
