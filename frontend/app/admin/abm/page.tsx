@@ -59,7 +59,7 @@ export default function ContentManagementPage() {
     }
     // Si es vendedor/fotógrafo, solo puede ver tags
     if (roleName === "vendedor" || roleName === "fotógrafo") {
-      return item.id === "tags"
+      return ["albums", "tags"].includes(item.id)
     }
     return false
   })
