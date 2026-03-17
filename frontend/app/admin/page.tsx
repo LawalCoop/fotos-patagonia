@@ -136,9 +136,15 @@ export default function AdminDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold">Panel de Administración</h1>
-        <p className="text-muted-foreground">
-          Gestiona pedidos, fotos y contenido de Fotos Patagonia
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <p className="text-muted-foreground">
+            Gestiona pedidos, fotos y contenido de Fotos Patagonia
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full w-fit">
+            <Camera className="h-3 w-3" />
+            <span>Total de fotos en el sistema: <span className="font-semibold text-foreground">{stats.totalPhotos}</span></span>
+          </div>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-4 items-end">
@@ -239,15 +245,6 @@ export default function AdminDashboard() {
             ) : (
               <p className="text-sm text-muted-foreground">No hay datos</p>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Fotos</CardTitle>
-            <Camera className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalPhotos}</div>
           </CardContent>
         </Card>
       </div>

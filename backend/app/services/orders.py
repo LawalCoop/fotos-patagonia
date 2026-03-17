@@ -34,31 +34,28 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
         return
 
     photographer = order_item.photo.photographer
+    # item_price is the effective price sent from frontend to satisfy MercadoPago
     item_price = order_item.price * order_item.quantity
     commission_percentage = photographer.commission_percentage
-    
-    # Real photos sold calculation (discount/combo ratio)
-    order = order_item.order
-    discount_ratio = 1.0
-    if order and order.subtotal and order.subtotal > 0:
-        discount_ratio = order.total / order.subtotal
-    elif order and order.total == 0:
-        discount_ratio = 0.0
 
-    real_photos_sold = order_item.quantity * discount_ratio
+    # The actual monetary value for this item is exactly item_price (no double discounting)
+    real_value_of_item = item_price
 
-    # Value of this item after applying proportional discounts
-    real_value_of_item = item_price * discount_ratio
+    # Calculate real photos sold based on actual money paid vs nominal photo price
+    nominal_photo_price = order_item.photo.price
+    if nominal_photo_price and nominal_photo_price > 0:
+        real_photos_sold = item_price / nominal_photo_price
+    else:
+        # Fallback if photo price is missing or 0
+        real_photos_sold = float(order_item.quantity)
 
     # Monetary earning calculation
-    # commission_percentage now represents the photographer's share
     earned_amount = real_value_of_item * (commission_percentage / 100.0)
 
     # Photo fraction earning calculation
     earned_photo_fraction = real_photos_sold * (commission_percentage / 100.0)
 
-    new_earning = Earning(
-        photographer_id=photographer.id,
+    new_earning = Earning(        photographer_id=photographer.id,
         order_id=order_item.order_id, # Link to the order
         order_item_id=order_item.id,
         amount=earned_amount,
