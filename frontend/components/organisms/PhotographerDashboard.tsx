@@ -104,7 +104,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Gestión de Pedidos
             </CardTitle>
@@ -112,7 +112,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
           </CardHeader>
           <CardContent>
             <Link href="/admin/pedidos">
-              <Button className="w-full" variant="outline">
+              <Button className="w-full">
                 Ver Pedidos <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -120,7 +120,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="flex items-center gap-2">
               <Camera className="h-5 w-5" />
               Gestión de Fotos
             </CardTitle>
@@ -128,7 +128,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
           </CardHeader>
           <CardContent>
             <Link href="/admin/fotos">
-              <Button className="w-full" variant="outline">
+              <Button className="w-full">
                 Administrar Fotos <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
