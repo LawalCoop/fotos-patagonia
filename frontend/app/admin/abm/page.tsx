@@ -58,11 +58,11 @@ export default function ContentManagementPage() {
       return true
     }
     // Si es vendedor/fotógrafo, solo puede ver tags
-    if (roleName === "vendedor" || roleName === "fotógrafo") {
+    if (roleName === "vendedor" || roleName === "fotógrafo" || roleName === "photographer") {
       return ["albums", "tags"].includes(item.id)
     }
     return false
-  })
+  })  
 
   return (
     <div className="container mx-auto px-4 py-8">

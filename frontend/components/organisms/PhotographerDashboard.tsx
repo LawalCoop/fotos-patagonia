@@ -104,7 +104,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle>
               <Package className="h-5 w-5" />
               Gestión de Pedidos
             </CardTitle>
@@ -120,7 +120,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle>
               <Camera className="h-5 w-5" />
               Gestión de Fotos
             </CardTitle>
