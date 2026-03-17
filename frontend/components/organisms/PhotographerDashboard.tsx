@@ -255,10 +255,11 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
         </CardFooter>
       </Card>
 
+      {/* 
       <div className="grid gap-8 md:grid-cols-2">
-        {/* Resumen Agrupado por Foto */}
         <PhotoEarningsSummaryTable photographerId={photographerId} />
       </div>
+      */}
     </div>
   );
 }
