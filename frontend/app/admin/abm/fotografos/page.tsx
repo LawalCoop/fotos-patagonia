@@ -2,23 +2,30 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Plus, ArrowLeft, Edit, Trash2, Loader2 } from "lucide-react"
+import { Plus, ArrowLeft, Edit, Trash2, Loader2, Lock } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import PhotographerModal from "@/components/molecules/photographer-modal"
 import { DeleteConfirmationModal } from "@/components/molecules/delete-confirmation-modal"
+import { ChangePasswordModal } from "@/components/molecules/change-password-modal"
 import { usePhotographers } from "@/hooks/photographers/usePhotographers"
+import { useUsers } from "@/hooks/users/useUser"
 import type { Photographer } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 
 export default function PhotographersManagementPage() {
   const { photographers, loading, error, createPhotographer, updatePhotographer, deletePhotographer } = usePhotographers()
+  const { adminChangePassword } = useUsers()
   const { toast } = useToast()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedPhotographer, setSelectedPhotographer] = useState<Photographer | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; photographerId: number | null }>({
     isOpen: false,
     photographerId: null,
+  })
+  const [passwordModal, setPasswordModal] = useState<{ isOpen: boolean; photographer: Photographer | null }>({
+    isOpen: false,
+    photographer: null,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -30,6 +37,37 @@ export default function PhotographersManagementPage() {
   const handleEditPhotographer = (photographer: Photographer) => {
     setSelectedPhotographer(photographer)
     setIsModalOpen(true)
+  }
+
+  const handleOpenChangePassword = (photographer: Photographer) => {
+    setPasswordModal({ isOpen: true, photographer })
+  }
+
+  const handleChangePasswordSave = async (password: string) => {
+    if (!passwordModal.photographer || !passwordModal.photographer.user_id) {
+        toast({
+            title: "Error",
+            description: "Este fotógrafo no tiene un usuario asociado",
+            variant: "destructive",
+        });
+        return;
+    }
+    
+    try {
+      await adminChangePassword(passwordModal.photographer.user_id, password)
+      toast({
+        title: "Contraseña actualizada",
+        description: `Se actualizó la contraseña para el fotógrafo ${passwordModal.photographer.name}`,
+      })
+      setPasswordModal({ isOpen: false, photographer: null })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Hubo un problema al cambiar la contraseña",
+        variant: "destructive",
+      })
+      throw error 
+    }
   }
 
   const handleSavePhotographer = async (data: Photographer) => {
@@ -163,6 +201,16 @@ export default function PhotographersManagementPage() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="rounded-lg bg-transparent text-blue-500 border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                      onClick={() => handleOpenChangePassword(photographer)}
+                      disabled={isSubmitting || !photographer.user_id}
+                      title="Cambiar contraseña"
+                    >
+                      <Lock className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
                       className="rounded-lg bg-transparent"
                       onClick={() => handleEditPhotographer(photographer)}
                       disabled={isSubmitting}
@@ -172,7 +220,7 @@ export default function PhotographersManagementPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-lg bg-transparent"
+                      className="rounded-lg border-red-200 bg-transparent text-destructive hover:bg-red-50 hover:text-destructive"
                       onClick={() => handleOpenDelete(photographer.id)}
                       disabled={isSubmitting}
                     >
@@ -212,6 +260,13 @@ export default function PhotographersManagementPage() {
         onConfirm={() => deleteConfirmation.photographerId && handleDelete(deleteConfirmation.photographerId)}
         onCancel={() => setDeleteConfirmation({ isOpen: false, photographerId: null })}
         isLoading={isSubmitting}
+      />
+
+      <ChangePasswordModal
+        isOpen={passwordModal.isOpen}
+        userEmail={photographers.find(p => p.id === passwordModal.photographer?.id)?.email || passwordModal.photographer?.name}
+        onClose={() => setPasswordModal({ isOpen: false, photographer: null })}
+        onSave={handleChangePasswordSave}
       />
     </div>
   )

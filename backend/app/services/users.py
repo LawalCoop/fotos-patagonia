@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
-from models.user import User, UserCreateSchema, UserUpdateSchema
+from models.user import User, UserCreateSchema, UserUpdateSchema, ChangePasswordSchema, AdminChangePasswordSchema
 from models.role import Role
-from core.security import get_password_hash
+from core.security import get_password_hash, verify_password
 from services.base import BaseService
 
 class UserService(BaseService):
@@ -61,3 +61,20 @@ class UserService(BaseService):
         """Deletes a user."""
         db_user = self.get_user(user_id)
         return self._delete_and_refresh(db_user)
+
+    def change_password(self, user_id: int, password_data: ChangePasswordSchema) -> User:
+        """Changes a user's password, verifying the current one."""
+        db_user = self.get_user(user_id)
+        if not verify_password(password_data.current_password, db_user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual es incorrecta")
+        
+        db_user.hashed_password = get_password_hash(password_data.new_password)
+        self._save_and_refresh(db_user)
+        return self.get_user(user_id)
+
+    def admin_change_password(self, user_id: int, password_data: AdminChangePasswordSchema) -> User:
+        """Changes a user's password without needing the current one (for admins)."""
+        db_user = self.get_user(user_id)
+        db_user.hashed_password = get_password_hash(password_data.new_password)
+        self._save_and_refresh(db_user)
+        return self.get_user(user_id)
