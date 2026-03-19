@@ -12,17 +12,18 @@ interface FilterBarProps {
     place?: string
     time?: string // "06".."22"
   }) => void
+  hideDateFilter?: boolean
 }
 
 const HOURS = buildHourRanges(6, 22)
 
-export function FilterBar({ onFilterChange }: FilterBarProps) {
+export function FilterBar({ onFilterChange, hideDateFilter = false }: FilterBarProps) {
   const [date, setDate] = useState("")
   const [time, setTime] = useState("") // "06".."22"
 
   const emit = (next: { date?: string; time?: string }) => {
     onFilterChange?.({
-      date: next.date || undefined,
+      date: hideDateFilter ? undefined : (next.date || undefined),
       time: next.time || undefined,
     })
   }
@@ -38,21 +39,23 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-card p-6 shadow-md md:flex-row md:items-end">
       {/* Fecha */}
-      <div className="flex-1">
-        <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Calendar className="h-4 w-4" />
-          Fecha
-        </label>
-        <Input
-          type="date"
-          value={date}
-          className="rounded-xl"
-          onChange={(e) => {
-            setDate(e.target.value)
-            emit({ date: e.target.value, time })
-          }}
-        />
-      </div>
+      {!hideDateFilter && (
+        <div className="flex-1">
+          <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            Fecha
+          </label>
+          <Input
+            type="date"
+            value={date}
+            className="rounded-xl"
+            onChange={(e) => {
+              setDate(e.target.value)
+              emit({ date: e.target.value, time })
+            }}
+          />
+        </div>
+      )}
 
       {/* Hora (dropdown por bloque horario) */}
       <div className="flex-1">

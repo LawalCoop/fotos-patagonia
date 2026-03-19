@@ -6,12 +6,14 @@ from models.photographer import PhotographerCreateSchema, PhotographerSchema, Ph
 from core.permissions import Permissions
 from models.user import User
 
+from typing import List
+
 router = APIRouter(
     prefix="/photographers",
     tags=["photographers"],
 )
 
-@router.get("/")
+@router.get("/", response_model=List[PhotographerSchema])
 def list_photographers(
     db: Session = Depends(get_db)
 ):
@@ -26,7 +28,7 @@ def create_photographer(
     ph = PhotographerService(db).create_photographer(ph_in)
     return ph
 
-@router.get("/{photographer_id}")
+@router.get("/{photographer_id}", response_model=PhotographerSchema)
 def get_photographer(
     photographer_id: int,
     db: Session = Depends(get_db),
@@ -101,6 +103,16 @@ def get_earnings_summary_by_order(
         start_date=start_date,
         end_date=end_date
     )
+
+@router.get("/{photographer_id}/earnings/last_date")
+def get_last_earning_date(
+    photographer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(
+        [Permissions.VIEW_OWN_EARNINGS, Permissions.VIEW_ANY_EARNINGS], require_all=False
+    ))
+):
+    return {"last_date": PhotographerService(db).get_last_earning_date(photographer_id, current_user)}
 
 @router.get("/{photographer_id}/earnings/summary", response_model=EarningsSummarySchema)
 def get_photographer_earnings_summary(

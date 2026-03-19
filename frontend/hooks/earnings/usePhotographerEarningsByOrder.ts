@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
-import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
 
 export interface OrderEarningSummary {
   order_id: number;
@@ -24,7 +22,7 @@ const LIMIT = 15;
 
 export function usePhotographerEarningsByOrder(
   photographerId: string | number | undefined,
-  dateRange: DateRange | undefined
+  dateRange: { from?: string; to?: string } | undefined
 ) {
   const [data, setData] = useState<PaginatedResponse<OrderEarningSummary>>({ items: [], total: 0 });
   const [page, setPage] = useState(1);
@@ -43,10 +41,10 @@ export function usePhotographerEarningsByOrder(
       let url = `/photographers/${photographerId}/earnings/summary_by_order?skip=${skip}&limit=${LIMIT}`;
       
       if (dateRange?.from) {
-        url += `&start_date=${format(dateRange.from, "yyyy-MM-dd")}`;
+        url += `&start_date=${dateRange.from}`;
       }
       if (dateRange?.to) {
-        url += `&end_date=${format(dateRange.to, "yyyy-MM-dd")}`;
+        url += `&end_date=${dateRange.to}`;
       }
 
       const response = await apiFetch<PaginatedResponse<OrderEarningSummary>>(url);
@@ -58,7 +56,7 @@ export function usePhotographerEarningsByOrder(
     } finally {
       setLoading(false);
     }
-  }, [photographerId, page, dateRange]);
+  }, [photographerId, page, dateRange?.from, dateRange?.to]);
 
   useEffect(() => {
     fetchEarnings();
