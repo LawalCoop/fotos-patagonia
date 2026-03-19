@@ -6,6 +6,8 @@ import logging
 import uuid
 from typing import List
 from datetime import datetime, timedelta, timezone
+import mimetypes
+import os
 
 from core.config import settings
 from pydantic import BaseModel
@@ -23,6 +25,7 @@ class PresignedURLData(BaseModel):
     original_filename: str
 
 class StorageService:
+
     def __init__(self):
         if not all([settings.S3_ENDPOINT_URL, settings.S3_ACCESS_KEY_ID, settings.S3_SECRET_ACCESS_KEY, settings.S3_BUCKET_NAME]):
             raise ValueError("S3 settings are not configured properly.")
@@ -33,7 +36,7 @@ class StorageService:
             aws_access_key_id=settings.S3_ACCESS_KEY_ID,
             aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
             region_name=settings.S3_REGION,
-            config=Config(signature_version='s3v4')
+            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
         )
         self.bucket_name = settings.S3_BUCKET_NAME
 
@@ -66,10 +69,17 @@ class StorageService:
             )
             # Replace the internal endpoint URL with the public one for browser access.
             # e.g., http://localstack:4566 -> http://localhost:4566
-            if settings.ENVIRONMENT == "local" and settings.S3_PUBLIC_URL and settings.S3_ENDPOINT_URL:
-                response = response.replace(settings.S3_ENDPOINT_URL, settings.S3_PUBLIC_URL)
+            public_endpoint = settings.s3_public_endpoint
+            internal_endpoint = settings.S3_ENDPOINT_URL
+            if public_endpoint and internal_endpoint:
+                # Normalize trailing slashes to avoid mismatches in replacement.
+                public_endpoint = public_endpoint.rstrip("/")
+                internal_endpoint = internal_endpoint.rstrip("/")
+                if internal_endpoint != public_endpoint:
+                    response = response.replace(internal_endpoint, public_endpoint)
 
             return response
+
         except ClientError as e:
             logging.error(f"Error generating presigned PUT URL: {e}")
             raise HTTPException(
@@ -82,17 +92,46 @@ class StorageService:
         Generate a presigned URL to view an object from S3.
         """
         try:
+            # Infer MIME type from file extension
+            mime_type, _ = mimetypes.guess_type(object_name)
+            if not mime_type:
+                 mime_type = "image/jpeg"
+            
+            # Extract filename for Content-Disposition
+            filename = os.path.basename(object_name)
+            
             response = self.s3_client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': self.bucket_name, 'Key': object_name},
+                Params={
+                    'Bucket': self.bucket_name,
+                    'Key': object_name,
+                    'ResponseContentType': mime_type,
+                    'ResponseContentDisposition': f'inline; filename="{filename}"'
+                },
                 ExpiresIn=expiration
             )
             # Replace the internal endpoint URL with the public one for browser access.
             # e.g., http://localstack:4566 -> http://localhost:4566
-            if settings.ENVIRONMENT == "local" and settings.S3_PUBLIC_URL and settings.S3_ENDPOINT_URL:
-                response = response.replace(settings.S3_ENDPOINT_URL, settings.S3_PUBLIC_URL)
+            public_endpoint = settings.s3_public_endpoint
+            internal_endpoint = settings.S3_ENDPOINT_URL
+            if public_endpoint and internal_endpoint:
+                # Normalize trailing slashes to avoid mismatches in replacement.
+                public_endpoint = public_endpoint.rstrip("/")
+                internal_endpoint = internal_endpoint.rstrip("/")
+                if internal_endpoint != public_endpoint:
+                    response = response.replace(internal_endpoint, public_endpoint)
                 
             return response
+
+            if public_endpoint and internal_endpoint:
+                # Normalize trailing slashes to avoid mismatches in replacement.
+                public_endpoint = public_endpoint.rstrip("/")
+                internal_endpoint = internal_endpoint.rstrip("/")
+                if internal_endpoint != public_endpoint:
+                    response = response.replace(internal_endpoint, public_endpoint)
+                
+            return response
+
         except ClientError as e:
             logging.error(f"Error generating presigned GET URL: {e}")
             raise HTTPException(
@@ -231,6 +270,8 @@ class StorageService:
                     object_name=object_name,
                     content_type=file_info.contentType
                 )
+                
+                logging.info(f"Prepared upload URL for {file_info.filename}: {upload_url}")
                 
                 response_data.append(
                     PresignedURLData(

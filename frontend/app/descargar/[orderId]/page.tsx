@@ -19,6 +19,24 @@ type OrderWithPhotoItems = Omit<Order, "items"> & {
   items: OrderItem[]
 }
 
+// iOS detection utility
+const isIOSDevice = (): boolean => {
+  if (typeof navigator === "undefined") return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+}
+
+// Get API base URL (replicates getApiBaseUrl from lib/api)
+const getApiBaseUrl = (): string => {
+  if (typeof window === "undefined") {
+    throw new Error("getApiBaseUrl cannot be called on server-side")
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "")
+  if (!baseUrl) {
+    throw new Error("NEXT_PUBLIC_API_URL not configured")
+  }
+  return baseUrl
+}
+
 // Heurística compartida con la vista pública para separar digital vs impresión
 const splitOrderItems = (items: OrderItem[]) => {
   const grouped = new Map<number, OrderItem[]>()
@@ -60,6 +78,12 @@ export default function DescargarPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDownloadingAll, setIsDownloadingAll] = useState(false)
   const [downloadingPhotoId, setDownloadingPhotoId] = useState<string | null>(null)
+  const [isIOSSafari, setIsIOSSafari] = useState(false)
+
+  useEffect(() => {
+    // Detect iOS on client side
+    setIsIOSSafari(isIOSDevice())
+  }, [])
 
   useEffect(() => {
     if (publicId) {
@@ -166,15 +190,33 @@ export default function DescargarPage() {
     if (isDownloadingAll) return
     setIsDownloadingAll(true)
     try {
-      const response = await apiFetch<{ download_url: string }>(`/orders/public/${publicId}/download-all`)
-      if (response.download_url) {
+      const isIOS = isIOSDevice()
+      
+      if (isIOS) {
+        // iOS Safari: Use direct ZIP endpoint (single download)
+        // Browser will handle the download automatically
+        const baseUrl = getApiBaseUrl()
+        const zipUrl = `${baseUrl}/orders/public/${publicId}/download-zip`
+        
         toast({
           title: "Iniciando descarga",
-          description: "Tus fotos se están preparando. La descarga comenzará en breve.",
+          description: "Tu archivo ZIP se está descargando.",
         })
-        window.open(response.download_url, "_blank")
+        
+        // Open in new tab with noopener to prevent security issues
+        window.open(zipUrl, "_blank", "noopener,noreferrer")
       } else {
-        throw new Error("No se recibió un link de descarga.")
+        // Non-iOS: Use existing download-all endpoint with sequential downloads
+        const response = await apiFetch<{ download_url: string }>(`/orders/public/${publicId}/download-all`)
+        if (response.download_url) {
+          toast({
+            title: "Iniciando descarga",
+            description: "Tus fotos se están preparando. La descarga comenzará en breve.",
+          })
+          window.open(response.download_url, "_blank")
+        } else {
+          throw new Error("No se recibió un link de descarga.")
+        }
       }
     } catch (err) {
       console.error("Failed to download all photos:", err)
@@ -293,7 +335,10 @@ export default function DescargarPage() {
                 ) : (
                   <>
                     <Download className="mr-2 h-5 w-5" />
-                    Descargar Todas las Fotos ({orderPhotos.length})
+                    {isIOSSafari 
+                      ? `Descargar todas (archivo ZIP) (${orderPhotos.length})`
+                      : `Descargar Todas las Fotos (${orderPhotos.length})`
+                    }
                   </>
                 )}
               </Button>
