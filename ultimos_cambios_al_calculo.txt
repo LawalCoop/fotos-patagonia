@@ -1,0 +1,39 @@
+# Resumen de Cambios en Cálculo de Ganancias y Dashboards
+Fecha: 19 de Marzo, 2026
+
+## 1. Ajuste en Prorrateo de Descuentos (Checkout)
+- **Problema:** El sistema usaba un promedio simple (Total / Cantidad de ítems) para informar el precio de cada foto al backend. Esto distorsionaba las ganancias cuando había fotos de distintos precios o ítems mezclados.
+- **Solución:** Se implementó un cálculo de **Prorrateo Proporcional**.
+- **Lógica:** 
+  1. Se calcula el `Total Nominal` (suma de precios originales).
+  2. Se obtiene un `Ratio de Descuento` (Total Pagado / Total Nominal).
+  3. Se aplica ese ratio al precio individual de cada foto.
+- **Seguridad:** Si el Total Efectivo es <= 0, todos los ítems se fuerzan a $0 para mantener la compatibilidad con el checkout de Mercado Pago.
+- **Archivo modificado:** `frontend/app/checkout/page.tsx`
+
+## 2. Corrección de Emails de Fotógrafos
+- **Problema:** Al editar el email de un fotógrafo, el cambio no se persistía porque el email pertenece al modelo `User` y el endpoint solo actualizaba el modelo `Photographer`.
+- **Solución:** Se modificó el servicio de backend para actualizar el email en el objeto `User` asociado y se agregaron propiedades de serialización para que la API devuelva el email actualizado inmediatamente.
+- **Archivos modificados:** 
+  - `backend/app/services/photographers.py`
+  - `backend/app/models/photographer.py`
+  - `backend/app/routers/photographers.py`
+
+## 3. Seguridad en Gestión de Contraseñas
+- **Cambios:**
+  - Se agregó el botón de "ojo" para ver/ocultar contraseña en el modal de cambio.
+  - Se agregó un campo de "Confirmar Contraseña" con validación de coincidencia.
+  - Se eliminó el campo de contraseña del modal "Editar Fotógrafo" para centralizar los cambios de clave en el botón de seguridad (candado).
+- **Archivo modificado:** `frontend/components/molecules/change-password-modal.tsx` y `photographer-modal.tsx`
+
+## 4. Mejoras en Dashboards y Filtros
+- **Filtros de Fecha:** Se eliminó el bug de zona horaria (conversion a UTC) pasando las fechas como strings `"YYYY-MM-DD"` directos desde el frontend al backend.
+- **Auto-filtro:** Tanto el Dashboard de Admin como el de Fotógrafo ahora detectan la fecha del último movimiento registrado y se filtran automáticamente por ese día al cargar (en lugar de mostrar el histórico total por defecto).
+- **Vista restringida de pedidos:** Los fotógrafos ahora solo ven pedidos del día actual, no pueden cambiar la fecha (filtro oculto) y ven un mensaje descriptivo si no hay ventas hoy.
+- **Orden Visual:** En el Dashboard del fotógrafo, las tarjetas de ganancias están arriba, el detalle al medio y las acciones de gestión abajo en una sola fila.
+- **Archivos modificados:**
+  - `frontend/components/organisms/PhotographerDashboard.tsx`
+  - `frontend/app/admin/page.tsx`
+  - `frontend/app/admin/pedidos/page.tsx`
+  - `frontend/hooks/earnings/usePhotographerEarningsByOrder.ts`
+  - `frontend/components/molecules/filter-bar.tsx`
