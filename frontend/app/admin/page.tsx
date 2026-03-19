@@ -47,6 +47,7 @@ export default function AdminDashboard() {
     endDate: "",
     photographerId: "",
   });
+  const [hasAutoFiltered, setHasAutoFiltered] = useState(false);
 
   const { data: dashboardData, loading: dashboardLoading } = useAdminDashboard(appliedFilters);
 
@@ -76,6 +77,19 @@ export default function AdminDashboard() {
     () => (Array.isArray(ordersData) ? ordersData : ordersData ? [ordersData] : []),
     [ordersData]
   );
+
+  // Auto-filter by the most recent order date on first load
+  useMemo(() => {
+    if (!appliedFilters.startDate && !appliedFilters.endDate && orders.length > 0 && !hasAutoFiltered) {
+      const lastDate = orders[0].created_at?.split("T")[0];
+      if (lastDate) {
+        setStartDateInput(lastDate);
+        setEndDateInput(lastDate);
+        setAppliedFilters(prev => ({ ...prev, startDate: lastDate, endDate: lastDate }));
+        setHasAutoFiltered(true);
+      }
+    }
+  }, [orders, appliedFilters.startDate, appliedFilters.endDate, hasAutoFiltered]);
 
   const userIsAdmin = isAdmin(user);
   

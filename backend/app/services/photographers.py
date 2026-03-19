@@ -44,7 +44,7 @@ class PhotographerService(BaseService):
         self.db = db
     ############################################################################
     def list_photographers(self):
-        photographers = self.db.query(Photographer).filter(Photographer.is_active == True).all()
+        photographers = self.db.query(Photographer).options(joinedload(Photographer.user)).filter(Photographer.is_active == True).all()
         return photographers
     ############################################################################
     def create_photographer(self, ph_in: PhotographerCreateSchema):
@@ -97,7 +97,7 @@ class PhotographerService(BaseService):
         return ph
     ############################################################################
     def update_photographer(self, ph_id: int, ph_in: PhotographerUpdateSchema):
-        ph = self.db.query(Photographer).filter(Photographer.id==ph_id).first()
+        ph = self.db.query(Photographer).options(joinedload(Photographer.user)).filter(Photographer.id==ph_id).first()
 
         if not ph:
             raise HTTPException(
@@ -106,6 +106,19 @@ class PhotographerService(BaseService):
             )
         
         updated_data = ph_in.model_dump(exclude_unset=True)
+        
+        if "email" in updated_data:
+            new_email = updated_data.pop("email")
+            if ph.user:
+                # Verificar si el nuevo email ya está en uso por otro usuario
+                existing_user = self.db.query(User).filter(User.email == new_email).first()
+                if existing_user and existing_user.id != ph.user.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Email already registered"
+                    )
+                ph.user.email = new_email
+                self.db.add(ph.user)
         
         for field, value in updated_data.items():
             setattr(ph, field, value)

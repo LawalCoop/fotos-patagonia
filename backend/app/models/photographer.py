@@ -16,10 +16,12 @@ class PhotographerCreateSchema(PhotographerBaseSchema):
 
 class PhotographerUpdateSchema(PhotographerBaseSchema):
     contact_info: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 class PhotographerInDBBaseSchema(PhotographerBaseSchema):
     id: int
     user_id: Optional[int] = None
+    email: Optional[EmailStr] = None
 
     class Config:
         from_attributes = True
@@ -42,3 +44,7 @@ class Photographer(Base):
     photos = relationship("Photo", back_populates="photographer")
     earnings = relationship("Earning", back_populates="photographer", passive_deletes=True)
     photo_sessions = relationship("PhotoSession", back_populates="photographer")
+
+    @property
+    def email(self):
+        return self.user.email if self.user else None
