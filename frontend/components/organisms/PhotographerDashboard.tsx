@@ -47,6 +47,7 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
   }, [earnings, appliedDateRange, hasAutoFiltered]);
 
   useEffect(() => {
+    let ignore = false;
     const params: { startDate?: string; endDate?: string } = {};
     if (appliedDateRange?.from) {
       params.startDate = appliedDateRange.from;
@@ -56,8 +57,16 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
     }
 
     getPhotographerEarningsSummary(photographerId, params)
-      .then((res) => setSummary(res as any))
+      .then((res) => {
+        if (!ignore) {
+          setSummary(res as any);
+        }
+      })
       .catch(console.error);
+
+    return () => {
+      ignore = true;
+    };
   }, [photographerId, getPhotographerEarningsSummary, appliedDateRange]);
 
   const handleApplyFilters = () => {
