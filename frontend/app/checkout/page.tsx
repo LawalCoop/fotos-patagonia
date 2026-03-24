@@ -100,8 +100,15 @@ export default function CheckoutPage() {
   
 
   const { user, isAuthenticated } = useAuthStore();
-  const { photos } = usePhotos();
+  const { photos, fetchPhotosByIds } = usePhotos();
   const { createOrder, createMercadoPagoPreference } = useCheckout();
+
+  useEffect(() => {
+    if (items.length > 0) {
+      const photoIds = items.map((item) => parseInt(item.photoId, 10));
+      fetchPhotosByIds(photoIds);
+    }
+  }, [items, fetchPhotosByIds]);
 
   // Create photos map for quick lookup
   const mappedPhotos = useMemo(
