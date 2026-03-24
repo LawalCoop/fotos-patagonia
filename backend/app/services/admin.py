@@ -56,7 +56,8 @@ class AdminService(BaseService):
         global_stats = global_stats_query.first()
         
         order_items_query = db.query(func.sum(OrderItem.quantity))\
-            .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)
+            .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)\
+            .filter(OrderItem.format == None)
         total_photos_sold = order_items_query.scalar()
 
         # --- Total Real Photos Sold ---
@@ -87,6 +88,7 @@ class AdminService(BaseService):
         ).join(Photo, Photographer.id == Photo.photographer_id)\
          .join(OrderItem, Photo.id == OrderItem.photo_id)\
          .join(orders_subquery, OrderItem.order_id == orders_subquery.c.id)\
+         .filter(OrderItem.format == None)\
          .group_by(Photographer.id)
 
         if photographer_id:
@@ -195,6 +197,7 @@ class AdminService(BaseService):
          .outerjoin(PhotoSession.album)\
          .filter(Photo.photographer_id == photographer_id)\
          .filter(Order.payment_status == PaymentStatus.PAID)\
+         .filter(OrderItem.format == None)\
          .group_by(Photo.id, Photo.filename, Album.name)\
          .order_by(func.sum(OrderItem.quantity).desc())
 

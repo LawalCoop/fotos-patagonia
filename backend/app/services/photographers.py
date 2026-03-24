@@ -218,6 +218,7 @@ class PhotographerService(BaseService):
          .join(Earning.order_item)\
          .join(OrderItem.photo)\
          .filter(Earning.photographer_id == photographer_id)\
+         .filter(OrderItem.format == None)\
          .group_by(Photo.id, Photo.filename)
 
         total = summary_query.count()
@@ -240,6 +241,7 @@ class PhotographerService(BaseService):
         ).select_from(Earning)\
          .join(Earning.order_item)\
          .filter(Earning.photographer_id == photographer_id)\
+         .filter(OrderItem.format == None)\
          .group_by(Earning.order_id)
          
         if start_date:
@@ -257,7 +259,9 @@ class PhotographerService(BaseService):
             totals_query = self.db.query(
                 OrderItem.order_id,
                 func.sum(OrderItem.quantity).label("order_total_photos")
-            ).filter(OrderItem.order_id.in_(order_ids)).group_by(OrderItem.order_id).all()
+            ).filter(OrderItem.order_id.in_(order_ids))\
+             .filter(OrderItem.format == None)\
+             .group_by(OrderItem.order_id).all()
             for t in totals_query:
                 order_totals[t.order_id] = t.order_total_photos
 
@@ -312,7 +316,8 @@ class PhotographerService(BaseService):
         
         # Query for total photos sold (sum of quantities)
         total_photos_sold_query = self.db.query(func.sum(OrderItem.quantity))\
-            .join(earnings_subquery, OrderItem.id == earnings_subquery.c.order_item_id)
+            .join(earnings_subquery, OrderItem.id == earnings_subquery.c.order_item_id)\
+            .filter(OrderItem.format == None)
         total_photos_sold = total_photos_sold_query.scalar() or 0
 
         # Query for detailed photo sales
@@ -326,6 +331,7 @@ class PhotographerService(BaseService):
         ).join(earnings_subquery, OrderItem.id == earnings_subquery.c.order_item_id)\
          .join(Photo, OrderItem.photo_id == Photo.id)\
          .join(PhotoSession, Photo.session_id == PhotoSession.id)\
+         .filter(OrderItem.format == None)\
          .group_by(Photo.id, Photo.object_name, PhotoSession.event_name)\
          .order_by(func.sum(earnings_subquery.c.amount).desc())
 
