@@ -27,7 +27,7 @@ export function useAdminDashboard(filters: DashboardFilters = {}) {
       if (photographerId) params.append("photographer_id", photographerId);
 
       const queryString = params.toString();
-      const url = `/admin/dashboard${queryString ? \`?\${queryString}\` : ""}`;
+      const url = `/admin/dashboard${queryString ? '?' + queryString : ""}`;
 
       const dashboardData = await apiFetch<AdminDashboardSchema>(url);
 
