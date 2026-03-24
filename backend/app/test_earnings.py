@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
-from app.services.photographers import PhotographerService
-from app.models.user import User
-from app.models.photographer import Photographer
+from db.session import SessionLocal
+from services.photographers import PhotographerService
+from models.user import User
+from models.photographer import Photographer
 
 def test():
     db = SessionLocal()
@@ -12,7 +12,6 @@ def test():
     p = db.query(Photographer).first()
     if p:
         print(f"Testing photographer ID: {p.id}")
-        # we need a valid user instance to bypass permissions check or an admin
         u = db.query(User).filter(User.role_id == 1).first() # Admin
         if u:
             try:
