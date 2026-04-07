@@ -80,22 +80,31 @@ export default function AdminDashboard() {
 
   // Auto-filter by the most recent order date on first load
   useEffect(() => {
-    // Si ya estamos filtrados o no hay órdenes después de cargar, marcamos como filtrado
     if (hasAutoFiltered) return;
 
     if (!ordersLoading) {
-      if (orders.length > 0) {
-        const lastDate = orders[0].created_at?.split("T")[0];
-        if (lastDate) {
-          setStartDateInput(lastDate);
-          setEndDateInput(lastDate);
-          setAppliedFilters({
-            startDate: lastDate,
-            endDate: lastDate,
-            photographerId: "",
-          });
+      let lastDate = "";
+      
+      if (orders && orders.length > 0) {
+        // Robust parsing: handles "YYYY-MM-DD", "YYYY-MM-DDTHH:mm...", "YYYY-MM-DD HH:mm..."
+        const rawDate = orders[0].created_at || (orders[0] as any).createdAt;
+        if (rawDate) {
+          lastDate = rawDate.split(/[T ]/)[0];
         }
       }
+
+      // Fallback to today if no orders or invalid date
+      if (!lastDate || !/^\d{4}-\d{2}-\d{2}$/.test(lastDate)) {
+        lastDate = new Date().toISOString().split("T")[0];
+      }
+
+      setStartDateInput(lastDate);
+      setEndDateInput(lastDate);
+      setAppliedFilters({
+        startDate: lastDate,
+        endDate: lastDate,
+        photographerId: "",
+      });
       setHasAutoFiltered(true);
     }
   }, [orders, ordersLoading, hasAutoFiltered]);
