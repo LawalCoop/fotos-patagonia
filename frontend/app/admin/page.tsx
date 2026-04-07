@@ -80,16 +80,25 @@ export default function AdminDashboard() {
 
   // Auto-filter by the most recent order date on first load
   useEffect(() => {
-    if (!appliedFilters.startDate && !appliedFilters.endDate && orders.length > 0 && !hasAutoFiltered) {
-      const lastDate = orders[0].created_at?.split("T")[0];
-      if (lastDate) {
-        setStartDateInput(lastDate);
-        setEndDateInput(lastDate);
-        setAppliedFilters(prev => ({ ...prev, startDate: lastDate, endDate: lastDate }));
-        setHasAutoFiltered(true);
+    // Si ya estamos filtrados o no hay órdenes después de cargar, marcamos como filtrado
+    if (hasAutoFiltered) return;
+
+    if (!ordersLoading) {
+      if (orders.length > 0) {
+        const lastDate = orders[0].created_at?.split("T")[0];
+        if (lastDate) {
+          setStartDateInput(lastDate);
+          setEndDateInput(lastDate);
+          setAppliedFilters({
+            startDate: lastDate,
+            endDate: lastDate,
+            photographerId: "",
+          });
+        }
       }
+      setHasAutoFiltered(true);
     }
-  }, [orders, appliedFilters.startDate, appliedFilters.endDate, hasAutoFiltered]);
+  }, [orders, ordersLoading, hasAutoFiltered]);
 
   const userIsAdmin = isAdmin(user);
   
@@ -121,7 +130,9 @@ export default function AdminDashboard() {
     return <PhotographerDashboard photographerId={photographerId} />;
     }
 
-    const isLoading = dashboardLoading;
+    // En el Admin, esperamos a que el auto-filtro se haya ejecutado al menos una vez
+    // para evitar mostrar el histórico total por un instante.
+    const isLoading = dashboardLoading || !hasAutoFiltered;
 
     if (isLoading) {
     return (
