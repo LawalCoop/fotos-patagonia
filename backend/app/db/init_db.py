@@ -44,6 +44,8 @@ ROLES_PERMISSIONS = {
         Permissions.DELETE_OWN_PHOTO.value,
         Permissions.VIEW_OWN_EARNINGS.value,
         Permissions.LIST_ORDERS.value, # Permiso acotado para listar pedidos propios en UI sin exponer list_all_orders
+        Permissions.UPDATE_ORDER_STATUS.value,
+        Permissions.EDIT_ORDER.value,
     ],
     "Customer": []
 }
