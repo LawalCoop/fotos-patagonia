@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   );
 
   // Auto-filter by the most recent order date on first load
-  useMemo(() => {
+  useEffect(() => {
     if (!appliedFilters.startDate && !appliedFilters.endDate && orders.length > 0 && !hasAutoFiltered) {
       const lastDate = orders[0].created_at?.split("T")[0];
       if (lastDate) {
