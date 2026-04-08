@@ -27,18 +27,32 @@ class PresignedURLData(BaseModel):
 class StorageService:
 
     def __init__(self):
-        if not all([settings.S3_ENDPOINT_URL, settings.S3_ACCESS_KEY_ID, settings.S3_SECRET_ACCESS_KEY, settings.S3_BUCKET_NAME]):
+        self.s3_client = None
+        self.bucket_name = None
+        self._initialized = False
+
+    def _initialize(self):
+        if self._initialized:
+            return
+
+        endpoint_url = settings.s3_endpoint_url
+        access_key_id = settings.s3_access_key_id
+        secret_access_key = settings.s3_secret_access_key
+        bucket_name = settings.S3_BUCKET_NAME
+        region = settings.s3_region
+
+        if not all([endpoint_url, access_key_id, secret_access_key, bucket_name]):
             raise ValueError("S3 settings are not configured properly.")
 
         self.s3_client = boto3.client(
             's3',
-            endpoint_url=settings.S3_ENDPOINT_URL,
-            aws_access_key_id=settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
-            region_name=settings.S3_REGION,
+            endpoint_url=endpoint_url,
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=secret_access_key,
+            region_name=region,
             config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
         )
-        self.bucket_name = settings.S3_BUCKET_NAME
+        self.bucket_name = bucket_name
 
         # Ensure the bucket exists, create it if it does not.
         try:
@@ -53,10 +67,15 @@ class StorageService:
                 logging.error("Error checking for bucket:", e)
                 raise
 
+    def _ensure_initialized(self):
+        if not self._initialized:
+            self._initialize()
+
     def generate_presigned_put_url(self, object_name: str, content_type: str, expiration: int = 3600) -> str:
         """
         Generate a presigned URL to upload an object to S3.
         """
+        self._ensure_initialized()
         try:
             response = self.s3_client.generate_presigned_url(
                 'put_object',
@@ -91,6 +110,7 @@ class StorageService:
         """
         Generate a presigned URL to view an object from S3.
         """
+        self._ensure_initialized()
         try:
             # Infer MIME type from file extension
             mime_type, _ = mimetypes.guess_type(object_name)
@@ -144,6 +164,7 @@ class StorageService:
         Deletes a file from the S3-compatible storage.
         :param object_name: The key of the object to delete.
         """
+        self._ensure_initialized()
         try:
             self.s3_client.delete_object(
                 Bucket=self.bucket_name,
@@ -162,6 +183,7 @@ class StorageService:
         """
         Calculates the total size of all objects in the bucket.
         """
+        self._ensure_initialized()
         total_size = 0
         try:
             paginator = self.s3_client.get_paginator('list_objects_v2')
@@ -193,6 +215,7 @@ class StorageService:
         """
         Deletes files older than a specified number of days.
         """
+        self._ensure_initialized()
         if days_older <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -249,6 +272,7 @@ class StorageService:
         Prepares a list of presigned PUT URLs for multiple files.
         Generates unique object names and includes content type in the signature.
         """
+        self._ensure_initialized()
         response_data = []
         if not files_info:
             raise HTTPException(

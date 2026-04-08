@@ -19,22 +19,42 @@ class Settings(BaseSettings):
 
     # S3 settings
     S3_ENDPOINT_URL: str | None = None
+    AWS_ENDPOINT_URL: str | None = None
     S3_ACCESS_KEY_ID: str | None = None
+    AWS_ACCESS_KEY_ID: str | None = None
     S3_SECRET_ACCESS_KEY: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
     S3_BUCKET_NAME: str | None = None
     # Use this for URLs returned to browser clients.
     # In docker compose, the backend can reach S3 via the internal service name (e.g. minio:9000)
     # while the browser must use a public endpoint (e.g. localhost:9000).
     S3_PUBLIC_URL: str | None = None
-    # Allow a second env var name to support existing setups.
     PUBLIC_S3_ENDPOINT: str | None = None
     S3_REGION: str | None = None
+    AWS_REGION: str | None = None
+    AWS_DEFAULT_REGION: str | None = None
     STORAGE_ALLOWED_ORIGINS: str | None = None
 
     @property
     def s3_public_endpoint(self) -> str | None:
         """Return the URL that should be used in presigned URLs returned to browsers."""
         return self.S3_PUBLIC_URL or self.PUBLIC_S3_ENDPOINT
+
+    @property
+    def s3_access_key_id(self) -> str | None:
+        return self.S3_ACCESS_KEY_ID or self.AWS_ACCESS_KEY_ID
+
+    @property
+    def s3_secret_access_key(self) -> str | None:
+        return self.S3_SECRET_ACCESS_KEY or self.AWS_SECRET_ACCESS_KEY
+
+    @property
+    def s3_region(self) -> str | None:
+        return self.S3_REGION or self.AWS_REGION or self.AWS_DEFAULT_REGION
+
+    @property
+    def s3_endpoint_url(self) -> str | None:
+        return self.S3_ENDPOINT_URL or self.AWS_ENDPOINT_URL
 
     FIRST_SUPERUSER_EMAIL: str = "admin@example.com" # Provide a default value
     FIRST_SUPERUSER_PASSWORD: str = "changeme" # Provide a default value
