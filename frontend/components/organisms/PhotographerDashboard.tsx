@@ -24,7 +24,8 @@ interface PhotographerDashboardProps {
 export function PhotographerDashboard({ photographerId }: PhotographerDashboardProps) {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [appliedDateRange, setAppliedDateRange] = useState<DateRange | undefined>();
+  const [appliedDateRange, setAppliedDateRange] = useState<{ from?: string; to?: string } | undefined>();
+  const [hasAutoFiltered, setHasAutoFiltered] = useState(false);
 
   const { earnings, loading, error, page, setPage, total, limit } = usePhotographerEarningsByOrder(
     photographerId,
@@ -34,24 +35,45 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
   const { getPhotographerEarningsSummary } = usePhotographers();
   const [summary, setSummary] = useState<PhotographerEarningsSummary | null>(null);
 
+  // Auto-filter by the most recent date on first load
   useEffect(() => {
+    if (!appliedDateRange && earnings.length > 0 && !hasAutoFiltered) {
+      const lastDate = earnings[0].created_at.split("T")[0];
+      setStartDate(lastDate);
+      setEndDate(lastDate);
+      setAppliedDateRange({ from: lastDate, to: lastDate });
+      setHasAutoFiltered(true);
+    }
+  }, [earnings, appliedDateRange, hasAutoFiltered]);
+
+  useEffect(() => {
+    let ignore = false;
     const params: { startDate?: string; endDate?: string } = {};
     if (appliedDateRange?.from) {
-      params.startDate = format(appliedDateRange.from, "yyyy-MM-dd");
+      params.startDate = appliedDateRange.from;
     }
     if (appliedDateRange?.to) {
-      params.endDate = format(appliedDateRange.to, "yyyy-MM-dd");
+      params.endDate = appliedDateRange.to;
     }
 
     getPhotographerEarningsSummary(photographerId, params)
-      .then((res) => setSummary(res as any))
+      .then((res) => {
+        if (!ignore) {
+          setSummary(res as any);
+        }
+      })
       .catch(console.error);
+
+    return () => {
+      ignore = true;
+    };
   }, [photographerId, getPhotographerEarningsSummary, appliedDateRange]);
 
   const handleApplyFilters = () => {
-    const fromDate = startDate ? new Date(startDate) : undefined;
-    const toDate = endDate ? new Date(endDate) : undefined;
-    setAppliedDateRange({ from: fromDate, to: toDate });
+    setAppliedDateRange({ 
+      from: startDate || undefined, 
+      to: endDate || undefined 
+    });
     setPage(1);
   };
 
@@ -96,55 +118,6 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
             <div className="text-2xl font-bold text-green-600">
               ${summary?.total_earnings.toFixed(2) || "0.00"}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Accesos Rápidos a Gestión */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Gestión de Pedidos
-            </CardTitle>
-            <CardDescription>Ver y administrar tus pedidos recientes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/pedidos">
-              <Button className="w-full">
-                Ver Pedidos <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="h-5 w-5" />
-              Gestión de Fotos
-            </CardTitle>
-            <CardDescription>Administrar tus fotos, sesiones y álbumes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/fotos">
-              <Button className="w-full">
-                Administrar Fotos <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
-            <CardDescription>Administrar álbumes, fotógrafos, tags y códigos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/abm">
-              <Button className="w-full">
-                Gestionar Contenido <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
@@ -254,6 +227,55 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
           />
         </CardFooter>
       </Card>
+
+      {/* Accesos Rápidos a Gestión */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Gestión de Pedidos
+            </CardTitle>
+            <CardDescription>Ver y administrar tus pedidos recientes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/pedidos">
+              <Button className="w-full">
+                Ver Pedidos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Gestión de Fotos
+            </CardTitle>
+            <CardDescription>Administrar tus fotos, sesiones y álbumes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/fotos">
+              <Button className="w-full">
+                Administrar Fotos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Gestión de Contenidos (ABM)</CardTitle>
+            <CardDescription>Administrar álbumes, fotógrafos, tags y códigos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/abm">
+              <Button className="w-full">
+                Gestionar Contenido <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* 
       <div className="grid gap-8 md:grid-cols-2">

@@ -100,8 +100,15 @@ export default function CheckoutPage() {
   
 
   const { user, isAuthenticated } = useAuthStore();
-  const { photos } = usePhotos();
+  const { photos, fetchPhotosByIds } = usePhotos();
   const { createOrder, createMercadoPagoPreference } = useCheckout();
+
+  useEffect(() => {
+    if (items.length > 0) {
+      const photoIds = items.map((item) => parseInt(item.photoId, 10));
+      fetchPhotosByIds(photoIds);
+    }
+  }, [items, fetchPhotosByIds]);
 
   // Create photos map for quick lookup
   const mappedPhotos = useMemo(
@@ -262,12 +269,14 @@ export default function CheckoutPage() {
     const orderDraftItems: OrderDraftItem[] = [...digitalLines, ...printLines];
 
     // FIX: Usar el precio efectivo para que coincida con el total de `useCartStore`
-    // que ya tiene combos/descuentos aplicados.
-    const hasItems = items.length > 0;
-    const effectivePricePerItem = hasItems ? effectiveTotal / items.length : 0;
+    // que ya tiene combos/descuentos aplicados. Repartimos el descuento proporcionalmente.
+    // Si la orden es de $0 (descuento 100% o modificada), aseguramos que todos los ítems vayan en 0.
+    const nominalTotal = orderDraftItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+    const discountRatio = nominalTotal > 0 ? (effectiveTotal / nominalTotal) : 0;
 
     const orderItemsForBackend: OrderItem[] = orderDraftItems.map((it) => ({
-      price: effectivePricePerItem,
+      // Asegurarse de que no sea NaN o infinito. Si effectiveTotal es 0, el price queda en 0.
+      price: effectiveTotal <= 0 ? 0 : it.price * discountRatio,
       quantity: it.quantity,
       photo_id: Number(it.photoId),
       format: it.printFormatLabel,

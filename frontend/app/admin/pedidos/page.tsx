@@ -49,11 +49,10 @@ export default function PedidosPage() {
   }>({ isOpen: false, orderId: null })
   // Obtener información del rol
   const user = useAuthStore((state) => state.user)
-  const roleName = getUserRoleName(user)?.toLowerCase()
   const userIsAdmin = isAdmin(user)
+  const photographerId = user?.photographer?.id ?? user?.photographer_id ?? null
 
-  const isPhotographer =
-    roleName === "fotógrafo" || roleName === "vendedor"
+  const isPhotographer = !userIsAdmin && !!photographerId
 
   const isTodayInArgentina = (dateValue?: string | null) => {
     if (!dateValue) return false
@@ -80,7 +79,19 @@ export default function PedidosPage() {
   //pagination
   const PAGE_SIZE = 10
   const [currentPage, setCurrentPage] = useState(1)
-  const [dateFilter, setDateFilter] = useState<string | undefined>()
+  
+  // Initialize dateFilter to today's local date for photographers
+  const [dateFilter, setDateFilter] = useState<string | undefined>(() => {
+    if (isPhotographer) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date())
+    }
+    return undefined
+  })
   const [timeFilter, setTimeFilter] = useState<string | undefined>() // "00".."23"
 
   useEffect(() => {
@@ -262,8 +273,11 @@ export default function PedidosPage() {
 
       <Card className="mb-6 rounded-2xl border-gray-200">
         <FilterBar
+          hideDateFilter={isPhotographer}
           onFilterChange={({ date, time }) => {
-            setDateFilter(date)
+            if (!isPhotographer) {
+              setDateFilter(date)
+            }
             setTimeFilter(time)
           }}
         />
@@ -322,8 +336,15 @@ export default function PedidosPage() {
       <Card className="rounded-2xl border-gray-200">
         <CardContent className="p-0">
           {filteredOrders.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No se encontraron pedidos
+            <div className="py-12 px-6 text-center text-muted-foreground">
+              {isPhotographer ? (
+                <>
+                  <p className="text-lg font-medium text-foreground mb-2">No tienes pedidos para el día de hoy.</p>
+                  <p>Como fotógrafo, en esta vista solo puedes acceder a los pedidos correspondientes a la fecha actual.</p>
+                </>
+              ) : (
+                <p>No se encontraron pedidos</p>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">

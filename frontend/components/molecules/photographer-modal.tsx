@@ -178,21 +178,23 @@ export default function PhotographerModal({
             />
           </div>
 
-          {/* Password (required on create, optional on edit) */}
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-semibold">
-              Contraseña {photographer ? "(opcional)" : "(requerida)"}
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              value={(formData as any).password || ""}
-              onChange={handleChange}
-              className="rounded-lg border-gray-200"
-            />
-          </div>
+          {/* Password (only on create) */}
+          {!photographer && (
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-semibold">
+                Contraseña (requerida)
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                value={(formData as any).password || ""}
+                onChange={handleChange}
+                className="rounded-lg border-gray-200"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label

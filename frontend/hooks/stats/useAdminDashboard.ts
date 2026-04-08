@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import type { AdminDashboardSchema } from "@/lib/types";
 
@@ -15,26 +15,35 @@ export function useAdminDashboard(filters: DashboardFilters = {}) {
   const [data, setData] = useState<AdminDashboardSchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchIdRef = useRef(0);
 
   const fetchDashboardData = useCallback(async () => {
+    const currentFetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (startDate) params.append("start_date", startDate);
       if (endDate) params.append("end_date", endDate);
       if (photographerId) params.append("photographer_id", photographerId);
-      
+
       const queryString = params.toString();
-      const url = `/admin/dashboard${queryString ? `?${queryString}` : ""}`;
-      
+      const url = `/admin/dashboard${queryString ? '?' + queryString : ""}`;
+
       const dashboardData = await apiFetch<AdminDashboardSchema>(url);
-      setData(dashboardData);
-      setError(null);
+
+      if (currentFetchId === fetchIdRef.current) {
+        setData(dashboardData);
+        setError(null);
+      }
     } catch (err: any) {
-      setError(err.message);
-      console.error("Error fetching admin dashboard data:", err);
+      if (currentFetchId === fetchIdRef.current) {
+        setError(err.message);
+        console.error("Error fetching admin dashboard data:", err);
+      }
     } finally {
-      setLoading(false);
+      if (currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [startDate, endDate, photographerId]);
 

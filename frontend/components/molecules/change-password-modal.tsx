@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Lock } from "lucide-react"
+import { Loader2, Lock, Eye, EyeOff } from "lucide-react"
 
 interface ChangePasswordModalProps {
   isOpen: boolean
@@ -16,12 +16,16 @@ interface ChangePasswordModalProps {
 
 export function ChangePasswordModal({ isOpen, userEmail, onClose, onSave }: ChangePasswordModalProps) {
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isOpen) {
       setPassword("")
+      setConfirmPassword("")
+      setShowPassword(false)
       setIsSaving(false)
       setError(null)
     }
@@ -31,6 +35,11 @@ export function ChangePasswordModal({ isOpen, userEmail, onClose, onSave }: Chan
     e.preventDefault()
     if (!password || password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres")
+      return
+    }
+    
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden")
       return
     }
 
@@ -56,26 +65,51 @@ export function ChangePasswordModal({ isOpen, userEmail, onClose, onSave }: Chan
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="new_password">Nueva Contraseña</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="new_password"
-                type="password"
-                placeholder="******"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-9"
-              />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new_password">Nueva Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="new_password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="******"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            
+            <div className="space-y-2">
+              <Label htmlFor="confirm_password">Confirmar Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirm_password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="******"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-9 pr-10"
+                />
+              </div>
+            </div>
+            
+            {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSaving || !password}>
+            <Button type="submit" disabled={isSaving || !password || !confirmPassword}>
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
