@@ -38,7 +38,7 @@ services:
 
   # Servicio de Localstack (S3)
   localstack:
-    image: localstack/localstack
+    image: localstack/localstack:3.8
     ports:
       - "4566:4566" # Puerto principal de LocalStack
       - "4510-4559:4510-4559" # Puertos para servicios individuales
