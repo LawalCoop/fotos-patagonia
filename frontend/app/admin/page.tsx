@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -79,17 +79,35 @@ export default function AdminDashboard() {
   );
 
   // Auto-filter by the most recent order date on first load
-  useMemo(() => {
-    if (!appliedFilters.startDate && !appliedFilters.endDate && orders.length > 0 && !hasAutoFiltered) {
-      const lastDate = orders[0].created_at?.split("T")[0];
-      if (lastDate) {
-        setStartDateInput(lastDate);
-        setEndDateInput(lastDate);
-        setAppliedFilters(prev => ({ ...prev, startDate: lastDate, endDate: lastDate }));
-        setHasAutoFiltered(true);
+  useEffect(() => {
+    if (hasAutoFiltered) return;
+
+    if (!ordersLoading) {
+      let lastDate = "";
+      
+      if (orders && orders.length > 0) {
+        // Robust parsing: handles "YYYY-MM-DD", "YYYY-MM-DDTHH:mm...", "YYYY-MM-DD HH:mm..."
+        const rawDate = orders[0].created_at || (orders[0] as any).createdAt;
+        if (rawDate) {
+          lastDate = rawDate.split(/[T ]/)[0];
+        }
       }
+
+      // Fallback to today if no orders or invalid date
+      if (!lastDate || !/^\d{4}-\d{2}-\d{2}$/.test(lastDate)) {
+        lastDate = new Date().toISOString().split("T")[0];
+      }
+
+      setStartDateInput(lastDate);
+      setEndDateInput(lastDate);
+      setAppliedFilters({
+        startDate: lastDate,
+        endDate: lastDate,
+        photographerId: "",
+      });
+      setHasAutoFiltered(true);
     }
-  }, [orders, appliedFilters.startDate, appliedFilters.endDate, hasAutoFiltered]);
+  }, [orders, ordersLoading, hasAutoFiltered]);
 
   const userIsAdmin = isAdmin(user);
   
@@ -121,7 +139,9 @@ export default function AdminDashboard() {
     return <PhotographerDashboard photographerId={photographerId} />;
     }
 
-    const isLoading = dashboardLoading;
+    // En el Admin, esperamos a que el auto-filtro se haya ejecutado al menos una vez
+    // para evitar mostrar el histórico total por un instante.
+    const isLoading = dashboardLoading || !hasAutoFiltered;
 
     if (isLoading) {
     return (

@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -50,14 +50,31 @@ def list_all_orders(
 def list_my_orders(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return OrderService(db).list_my_orders(user_id=user.id)
 
+def verify_order_access(order, current_user: User):
+    user_permissions = {p.name for p in current_user.role.permissions}
+    is_admin = Permissions.FULL_ACCESS.value in user_permissions
+    
+    if not is_admin and current_user.photographer:
+        has_access = False
+        photographer_id = current_user.photographer.id
+        for item in order.items:
+            if item.photo.photographer_id == photographer_id:
+                has_access = True
+                break
+        
+        if not has_access:
+            raise HTTPException(status_code=403, detail="No tienes permiso para acceder a este pedido")
+
 @router.get("/{order_id}")
 def get_order_details(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker([Permissions.LIST_ALL_ORDERS]))
-    # TODO: Permitir a un usuario ver su propia orden.
+    current_user: User = Depends(PermissionChecker([Permissions.LIST_ALL_ORDERS, Permissions.LIST_ORDERS], require_all=False))
 ):
-    return OrderService(db).get_order_details(order_id)
+    service = OrderService(db)
+    order = service.get_order_details(order_id)
+    verify_order_access(order, current_user)
+    return order
 
 @router.get("/public/{public_id}/download-zip")
 def download_order_as_zip(
@@ -90,7 +107,10 @@ def update_order_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker([Permissions.UPDATE_ORDER_STATUS]))
 ):
-    return OrderService(db).update_order_status(order_id, new_status, payment_method)
+    service = OrderService(db)
+    order = service.get_order_details(order_id)
+    verify_order_access(order, current_user)
+    return service.update_order_status(order_id, new_status, payment_method)
 
 @router.put("/{order_id}")
 def edit_order(
@@ -99,7 +119,10 @@ def edit_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker([Permissions.EDIT_ORDER]))
 ):
-    return OrderService(db).edit_order(order_id, order_in)
+    service = OrderService(db)
+    order = service.get_order_details(order_id)
+    verify_order_access(order, current_user)
+    return service.edit_order(order_id, order_in)
 
 @router.post("/{order_id}/send-email")
 def send_order_email(
