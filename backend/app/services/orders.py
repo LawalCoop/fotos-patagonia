@@ -15,10 +15,11 @@ from services.cart import CartService # Importar CartService
 from core.config import settings
 from datetime import date
 
-def process_earnings_for_order_item(db: Session, order_item: OrderItem):
+def process_earnings_for_order_item(db: Session, order_item: OrderItem, adjustment_factor: float = 1.0):
     """
     Calculates and records the earning for a photographer based on a sold OrderItem.
     This is now safe against missing photos or photographers.
+    Includes an adjustment_factor to handle manual subtotal overrides.
     """
     # Ensure photo is loaded
     if not order_item.photo:
@@ -39,11 +40,11 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
         return
 
     photographer = order_item.photo.photographer
-    # item_price is the effective price sent from frontend to satisfy MercadoPago
-    item_price = order_item.price * order_item.quantity
+    # item_price is the effective price considering the adjustment factor
+    item_price = (order_item.price * order_item.quantity) * adjustment_factor
     commission_percentage = photographer.commission_percentage
 
-    # The actual monetary value for this item is exactly item_price (no double discounting)
+    # The actual monetary value for this item is exactly item_price
     real_value_of_item = item_price
 
     # Calculate real photos sold based on actual money paid vs nominal photo price
@@ -52,7 +53,7 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
         real_photos_sold = item_price / nominal_photo_price
     else:
         # Fallback if photo price is missing or 0
-        real_photos_sold = float(order_item.quantity)
+        real_photos_sold = (float(order_item.quantity)) * adjustment_factor
 
     # Monetary earning calculation
     earned_amount = real_value_of_item * (commission_percentage / 100.0)
@@ -60,7 +61,8 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
     # Photo fraction earning calculation
     earned_photo_fraction = real_photos_sold * (commission_percentage / 100.0)
 
-    new_earning = Earning(        photographer_id=photographer.id,
+    new_earning = Earning(
+        photographer_id=photographer.id,
         order_id=order_item.order_id, # Link to the order
         order_item_id=order_item.id,
         amount=earned_amount,
@@ -69,7 +71,6 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem):
         real_photos_sold=real_photos_sold
     )
     db.add(new_earning)
-    # No commit here, as it should be part of a larger transaction
     return new_earning
 
 class OrderService(BaseService):
@@ -226,8 +227,9 @@ class OrderService(BaseService):
         
     def process_earnings_for_order(self, order: Order):
         """
-        Calculates and records earnings for all items in an order by calling
-        process_earnings_for_order_item for each item.
+        Calculates and records earnings for all items in an order.
+        If the order has a manual subtotal override, it calculates an adjustment factor
+        to distribute the actual paid amount proportionally among all items.
         """
         # Ensure items and their photos/photographers are loaded
         order = self.db.query(Order).options(
@@ -237,10 +239,24 @@ class OrderService(BaseService):
         if not order or not order.items:
             return
 
-        for item in order.items:
-            process_earnings_for_order_item(self.db, item)
+        # Calculate adjustment factor if there's a manual override or discount
+        # We compare the current order.subtotal (which may be overridden) 
+        # with the sum of (item.price * item.quantity)
+        nominal_subtotal = sum((item.price * item.quantity) for item in order.items if item.format is None)
         
-        # The commit will be handled by the calling function (e.g., mark_order_as_paid)
+        adjustment_factor = 1.0
+        if nominal_subtotal > 0 and order.subtotal is not None:
+            adjustment_factor = order.subtotal / nominal_subtotal
+            
+            if abs(adjustment_factor - 1.0) > 0.001:
+                print(f"INFO: Applying adjustment factor of {adjustment_factor:.4f} to earnings for order {order.id} due to subtotal override ({order.subtotal} vs {nominal_subtotal})")
+
+        for item in order.items:
+            # Skip physical prints for digital earnings calculation if necessary, 
+            # or include them if they also generate commissions. 
+            # Usually only digital photos are considered 'real photos sold'.
+            process_earnings_for_order_item(self.db, item, adjustment_factor=adjustment_factor)
+        
         return
 
     def mark_order_as_paid(self, order_id: int, payment_method: PaymentMethod, external_payment_id: str | None = None) -> Order:
