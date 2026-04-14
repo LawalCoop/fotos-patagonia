@@ -81,10 +81,15 @@ class OrderService(BaseService):
         elif order.user and order.user.email:
             customer_name = order.user.email.split('@')[0]
 
-        # Obtener el nombre del álbum (PhotoSession event_name) del primer item, si existe
+        # Obtener el nombre del álbum del primer item, si existe
         album_name = "tu compra"
-        if order.items and order.items[0].photo and order.items[0].photo.session and order.items[0].photo.session.event_name:
-            album_name = order.items[0].photo.session.event_name
+        if order.items and order.items[0].photo and order.items[0].photo.session:
+            # Primero intenta buscar el nombre del álbum asignado a la sesión
+            if getattr(order.items[0].photo.session, 'album', None) and order.items[0].photo.session.album.name:
+                album_name = order.items[0].photo.session.album.name
+            # Si no hay álbum, cae en el event_name (que a veces es "Carga de fotos YYYY-MM...")
+            elif order.items[0].photo.session.event_name:
+                album_name = order.items[0].photo.session.event_name
 
         # Construir tabla con los items del pedido
         items_html = ""
@@ -175,7 +180,7 @@ class OrderService(BaseService):
         query = self.db.query(Order).options(
             joinedload(Order.user),
             joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.photographer),
-            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.session),
+            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.session).joinedload(PhotoSession.album),
             joinedload(Order.discount)
         )
 
@@ -185,7 +190,7 @@ class OrderService(BaseService):
             from datetime import timedelta
             query = query.filter(Order.created_at < end_date + timedelta(days=1))
         if photographer_id:
-            query = query.filter(Order.items.any(OrderItem.photo.has(photographer_id=photographer_id)))
+            query = query.join(OrderItem).join(Photo).filter(Photo.photographer_id == photographer_id).distinct()
 
         query = query.order_by(Order.created_at.desc())
 
@@ -201,7 +206,7 @@ class OrderService(BaseService):
     def get_order_details(self, order_id: int) -> Order:
         order = self.db.query(Order).options(
             joinedload(Order.user),
-            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.session),
+            joinedload(Order.items).joinedload(OrderItem.photo).joinedload(Photo.session).joinedload(PhotoSession.album),
             joinedload(Order.discount),
             joinedload(Order.earnings)
         ).filter(Order.id == order_id).first()
@@ -212,7 +217,9 @@ class OrderService(BaseService):
     def get_order_by_public_id(self, public_id: str) -> Order:
         order = self.db.query(Order).options(
             joinedload(Order.user),
-            joinedload(Order.items).options(joinedload(OrderItem.photo)),
+            joinedload(Order.items).options(
+                joinedload(OrderItem.photo).joinedload(Photo.session).joinedload(PhotoSession.album)
+            ),
             joinedload(Order.discount)
         ).filter(Order.public_id == public_id).first()
         if not order:
@@ -433,7 +440,10 @@ class OrderService(BaseService):
 
         album_name = "fotos"
         if order.items and order.items[0].photo and order.items[0].photo.session:
-            album_name = order.items[0].photo.session.event_name or "fotos"
+            if getattr(order.items[0].photo.session, 'album', None) and order.items[0].photo.session.album.name:
+                album_name = order.items[0].photo.session.album.name
+            elif order.items[0].photo.session.event_name:
+                album_name = order.items[0].photo.session.event_name
             
         safe_album = "".join(c if c.isalnum() else '_' for c in album_name)
         zip_filename = f"{safe_album}_pedido_{order.id}.zip"
