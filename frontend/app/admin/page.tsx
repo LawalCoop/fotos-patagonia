@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/lib/types";
-import { isAdmin } from "@/lib/types";
+import { isAdmin, getUserRoleName } from "@/lib/types";
 import { useAuthStore } from "@/lib/store";
 import { useOrders } from "@/hooks/orders/useOrders";
 import { PhotographerDashboard } from "@/components/organisms/PhotographerDashboard";
