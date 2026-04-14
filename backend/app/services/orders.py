@@ -185,7 +185,7 @@ class OrderService(BaseService):
             from datetime import timedelta
             query = query.filter(Order.created_at < end_date + timedelta(days=1))
         if photographer_id:
-            query = query.join(OrderItem).join(Photo).filter(Photo.photographer_id == photographer_id)
+            query = query.filter(Order.items.any(OrderItem.photo.has(photographer_id=photographer_id)))
 
         query = query.order_by(Order.created_at.desc())
 
