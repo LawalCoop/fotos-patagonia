@@ -30,6 +30,7 @@ class AlbumInSessionSchema(AlbumInDBBaseSchema):
     pass
 
 class AlbumSchema(AlbumInDBBaseSchema):
+    cover_photo_url: Optional[str] = None
     sessions: list['PhotoSessionSchema'] = []
     tags: List[TagSchema] = []
     combos: List[ComboSchema] = []

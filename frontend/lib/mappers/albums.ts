@@ -27,6 +27,7 @@ export function mapBackendAlbumToListItem(album: any): AlbumListItem {
     name: album.name,
     description: album.description,
     coverPhotoObjectName: firstSession?.photos?.[0]?.object_name,
+    coverPhotoUrl: album.cover_photo_url,
     createdAt: firstSession?.event_date,
     location: firstSession?.location,
     event: firstSession?.event_name,

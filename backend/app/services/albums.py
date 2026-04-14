@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
+from services.storage import storage_service
+import logging
 from typing import List
 
 from .base import BaseService
@@ -17,9 +19,26 @@ from services.storage import storage_service # Import storage_service for direct
 class AlbumService(BaseService):
     def _populate_photo_urls(self, album: Album) -> Album:
         """
-        Populates presigned URLs for all photos within an album's sessions.
+        Populates presigned URL only for the cover photo (first photo of the first session)
+        to heavily optimize the loading speed of the albums list in the frontend.
         """
-        # This function is now a placeholder. The frontend will request URLs based on object_name.
+        try:
+            if album.sessions and len(album.sessions) > 0:
+                first_session = album.sessions[0]
+                if first_session.photos and len(first_session.photos) > 0:
+                    first_photo = first_session.photos[0]
+                    if first_photo.object_name:
+                        # Create thumbnail object name pattern to match the frontend expectations
+                        base_name = first_photo.object_name.rsplit('.', 1)[0]
+                        ext = first_photo.object_name.rsplit('.', 1)[1] if '.' in first_photo.object_name else 'jpg'
+                        thumb_name = f"{base_name}_thumb.{ext}"
+                        
+                        # Generate URL
+                        url = storage_service.generate_presigned_get_url(thumb_name, expiration=3600)
+                        setattr(album, 'cover_photo_url', url)
+        except Exception as e:
+            logging.error(f"Failed to generate presigned URL for album {album.id} cover: {e}")
+        
         return album
 
     def list_albums(self) -> list[Album]:
