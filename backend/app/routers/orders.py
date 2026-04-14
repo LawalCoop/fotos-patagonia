@@ -83,6 +83,8 @@ def download_order_as_zip(
     public_id: str,
     db: Session = Depends(get_db),
 ):
+    import logging
+    logging.info(f"ZIP Download requested for order public_id: {public_id}")
     return OrderService(db).generate_order_zip(public_id)
 
 @router.get("/public/{public_id}", response_model=PublicOrderSchema)
