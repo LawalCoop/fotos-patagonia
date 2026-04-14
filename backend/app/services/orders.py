@@ -47,18 +47,14 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem, adjustme
     # The actual monetary value for this item is exactly item_price
     real_value_of_item = item_price
 
-    # Calculate real photos sold based on actual money paid vs nominal photo price
-    nominal_photo_price = order_item.photo.price
-    if nominal_photo_price and nominal_photo_price > 0:
-        real_photos_sold = item_price / nominal_photo_price
-    else:
-        # Fallback if photo price is missing or 0
-        real_photos_sold = (float(order_item.quantity)) * adjustment_factor
+    # Calculate real photos sold based on the quantity and the adjustment factor.
+    # This represents the gross proportion of photos paid by the customer.
+    real_photos_sold = float(order_item.quantity) * adjustment_factor
 
     # Monetary earning calculation
     earned_amount = real_value_of_item * (commission_percentage / 100.0)
 
-    # Photo fraction earning calculation
+    # Photo fraction earning calculation (this is what the photographer actually 'earns')
     earned_photo_fraction = real_photos_sold * (commission_percentage / 100.0)
 
     new_earning = Earning(

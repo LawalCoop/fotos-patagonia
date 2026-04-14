@@ -87,37 +87,51 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
   return (
     <div className="space-y-8">
       {/* Tarjetas de Resumen General */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ventas Totales (Nominales)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ventas (Cant.)</CardTitle>
             <Camera className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary?.total_photos_sold || 0}</div>
+            <CardDescription className="text-xs mt-1">Archivos entregados</CardDescription>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Ventas Totales (Reales)</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-600">Ventas (Fotos)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {summary?.total_real_photos_sold?.toFixed(1) || "0.0"}
+            </div>
+            <CardDescription className="text-xs mt-1">Volumen bruto pagado</CardDescription>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Ganancia (Fotos)</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {summary?.total_real_photos_sold?.toFixed(1) || "0.0"}
+              {summary?.total_earned_photo_fraction?.toFixed(1) || "0.0"}
             </div>
-            <CardDescription className="text-xs mt-1">Ajustado por descuentos/combos</CardDescription>
+            <CardDescription className="text-xs mt-1">Tu parte neta en fotos</CardDescription>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-green-600">Ganancias Netas</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-600">Ganancia (Dinero)</CardTitle>
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
               ${summary?.total_earnings.toFixed(2) || "0.00"}
             </div>
+            <CardDescription className="text-xs mt-1">Monto a cobrar</CardDescription>
           </CardContent>
         </Card>
       </div>
@@ -192,10 +206,11 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
                   <TableHead>Fecha</TableHead>
                   <TableHead>Nº Orden</TableHead>
                   <TableHead className="text-center" title="Fotos totales en la orden">Totales Orden</TableHead>
-                  <TableHead className="text-center">Tus Fotos</TableHead>
-                  <TableHead className="text-center" title="Ajustado por descuentos">Tus Fotos (Reales)</TableHead>
+                  <TableHead className="text-center" title="Cantidad de tus fotos en esta orden">Venta (Cant.)</TableHead>
+                  <TableHead className="text-center" title="Volumen bruto pagado (después de descuentos)">Venta (Fotos)</TableHead>
+                  <TableHead className="text-center" title="Tu parte neta en fotos (aplicando comisión)">Ganancia (Fotos)</TableHead>
                   <TableHead className="text-center">% Orden</TableHead>
-                  <TableHead className="text-right">Ganancia (Neta)</TableHead>
+                  <TableHead className="text-right">Ganancia (Dinero)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -207,7 +222,8 @@ export function PhotographerDashboard({ photographerId }: PhotographerDashboardP
                     <TableCell>#{earning.order_id}</TableCell>
                     <TableCell className="text-center">{earning.order_total_photos}</TableCell>
                     <TableCell className="text-center">{earning.total_photos}</TableCell>
-                    <TableCell className="text-center font-semibold text-primary">{earning.real_photos_sold?.toFixed(1)}</TableCell>
+                    <TableCell className="text-center font-semibold text-blue-600">{earning.real_photos_sold?.toFixed(1)}</TableCell>
+                    <TableCell className="text-center font-semibold text-primary">{earning.earned_photo_fraction?.toFixed(1)}</TableCell>
                     <TableCell className="text-center font-medium">
                       {earning.percentage_in_order?.toFixed(0)}%
                     </TableCell>
