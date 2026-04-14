@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, status, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from deps import get_db, get_current_user, PermissionChecker
@@ -74,6 +75,15 @@ def get_order_details(
     order = service.get_order_details(order_id)
     verify_order_access(order, current_user)
     return order
+
+from fastapi.responses import StreamingResponse
+
+@router.get("/public/{public_id}/download-zip")
+def download_order_as_zip(
+    public_id: str,
+    db: Session = Depends(get_db),
+):
+    return OrderService(db).generate_order_zip(public_id)
 
 @router.get("/public/{public_id}", response_model=PublicOrderSchema)
 def get_public_order_details(

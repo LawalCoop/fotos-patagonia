@@ -1,3 +1,8 @@
+import zipfile
+import io
+import logging
+from fastapi.responses import StreamingResponse
+from services.storage import storage_service
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 from models.order import Order, OrderItem, OrderStatus, OrderUpdateSchema, PaymentMethod, PaymentStatus
@@ -357,3 +362,53 @@ class OrderService(BaseService):
     def generate_qr_code(self, order_id: int):
         # Business logic for generating QR code for an order
         return {"message": f"OrderService: Generate QR code for order {order_id} logic"}
+    def generate_order_zip(self, public_id: str) -> StreamingResponse:
+        order = self.get_order_by_public_id(public_id)
+        if not order.items:
+            raise HTTPException(status_code=400, detail="Order has no photos to download")
+
+        photos_dict = {}
+        for item in order.items:
+            if item.photo and item.photo.object_name:
+                photos_dict[item.photo.id] = item.photo
+
+        if not photos_dict:
+            raise HTTPException(status_code=400, detail="No valid photos available in this order")
+
+        photos = list(photos_dict.values())
+
+        def iter_zip():
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for photo in photos:
+                    try:
+                        obj = storage_service.s3_client.get_object(
+                            Bucket=storage_service.bucket_name,
+                            Key=photo.object_name
+                        )
+                        image_bytes = obj['Body'].read()
+                        
+                        base_name = (photo.place or photo.description or f"foto-{photo.id}").strip()
+                        safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in base_name)[:100]
+                        filename = f"{safe_name}_{photo.id}.jpg"
+                        
+                        zf.writestr(filename, image_bytes)
+                    except Exception as e:
+                        logging.error(f"Error fetching photo {photo.id} for ZIP: {e}")
+                        continue
+
+            zip_buffer.seek(0)
+            yield zip_buffer.getvalue()
+
+        album_name = "fotos"
+        if order.items and order.items[0].photo and order.items[0].photo.session:
+            album_name = order.items[0].photo.session.event_name or "fotos"
+            
+        safe_album = "".join(c if c.isalnum() else '_' for c in album_name)
+        zip_filename = f"{safe_album}_pedido_{order.id}.zip"
+
+        return StreamingResponse(
+            iter_zip(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+        )

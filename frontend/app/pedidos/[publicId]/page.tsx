@@ -213,20 +213,39 @@ export default function PublicOrderDetailPage() {
   }
 
 
+  // iOS detection state
+  const [isIOS, setIsIOS] = useState(false)
+
+  useEffect(() => {
+    const checkIOS = () => {
+      if (typeof navigator === "undefined") return false
+      return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    }
+    setIsIOS(checkIOS())
+  }, [])
+
   const handleDownloadAll = async () => {
     if (!digitalOrderPhotos.length || isDownloading) return;
   
     setIsDownloading(true);
     try {
-      const downloadPromises = digitalOrderPhotos.map(async (photo) => {
-        const url = photo.url || photo.watermark_url;
-        if (!url) return;
-  
-        await triggerFileDownload(url, buildPhotoFilename(photo));
-        // Pausa mínima para evitar bloqueo del navegador en descargas sucesivas
-        await new Promise((r) => setTimeout(r, 300));
-      });
-      await Promise.all(downloadPromises);
+      if (isIOS) {
+        // En iOS, usamos el endpoint de ZIP porque Safari bloquea múltiples descargas
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
+        const url = `${baseUrl}/orders/public/${publicId}/download-zip`;
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        // En otros navegadores, descargamos una por una (comportamiento original)
+        const downloadPromises = digitalOrderPhotos.map(async (photo) => {
+          const url = photo.url || photo.watermark_url;
+          if (!url) return;
+    
+          await triggerFileDownload(url, buildPhotoFilename(photo));
+          // Pausa mínima para evitar bloqueo del navegador en descargas sucesivas
+          await new Promise((r) => setTimeout(r, 300));
+        });
+        await Promise.all(downloadPromises);
+      }
     } catch (error) {
       console.error("Error descargando fotos", error);
     } finally {
@@ -349,7 +368,7 @@ export default function PublicOrderDetailPage() {
                 className="w-full rounded-xl bg-primary py-6 text-lg font-semibold text-foreground hover:bg-primary-hover"
               >
                 <Download className="mr-2 h-5 w-5" />
-                {isDownloading ? "Descargando..." : `Descargar Todas las Fotos (${digitalOrderPhotos.length})`}
+                {isDownloading ? "Preparando descarga..." : isIOS ? "Descargar todas en un archivo (.ZIP)" : `Descargar Todas las Fotos (${digitalOrderPhotos.length})`}
               </Button>
             </div>
           )}
