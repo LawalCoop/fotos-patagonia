@@ -10,6 +10,7 @@ export interface OrderEarningSummary {
   order_total_photos: number;
   percentage_in_order: number;
   real_photos_sold: number;
+  earned_photo_fraction: number;
   total_earnings: number;
 }
 

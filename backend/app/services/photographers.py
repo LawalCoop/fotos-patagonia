@@ -213,6 +213,7 @@ class PhotographerService(BaseService):
             Photo.filename.label("photo_filename"),
             func.sum(OrderItem.quantity).label("times_sold"),
             func.sum(Earning.real_photos_sold).label("real_photos_sold"),
+            func.sum(Earning.earned_photo_fraction).label("earned_photo_fraction"),
             func.sum(Earning.amount).label("total_earnings")
         ).select_from(Earning)\
          .join(Earning.order_item)\
@@ -237,6 +238,7 @@ class PhotographerService(BaseService):
             func.min(Earning.created_at).label("created_at"),
             func.sum(OrderItem.quantity).label("total_photos"),
             func.sum(Earning.real_photos_sold).label("real_photos_sold"),
+            func.sum(Earning.earned_photo_fraction).label("earned_photo_fraction"),
             func.sum(Earning.amount).label("total_earnings")
         ).select_from(Earning)\
          .join(Earning.order_item)\
