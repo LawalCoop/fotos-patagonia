@@ -49,7 +49,6 @@ export default function AdminDashboard() {
   });
   const [hasAutoFiltered, setHasAutoFiltered] = useState(false);
 
-  const { user } = useAuthStore();
   const canViewAnyEarnings = user && getUserRoleName(user) === "Administrador";
 
   const { data: dashboardData, loading: dashboardLoading } = useAdminDashboard(appliedFilters, { enabled: !!canViewAnyEarnings });
