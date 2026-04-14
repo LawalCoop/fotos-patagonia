@@ -1,19 +1,14 @@
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
-from fastapi.responses import StreamingResponse
 from models.order import Order, OrderItem, OrderStatus, OrderUpdateSchema, PaymentMethod, PaymentStatus
 from models.earning import Earning
 from models.photo import Photo
 from services.base import BaseService
-from services.storage import storage_service
 from models.photo_session import PhotoSession # Importar PhotoSession
 from services.email_service import send_email
 from services.cart import CartService # Importar CartService
 from core.config import settings
 from datetime import date
-import zipfile
-import io
-import logging
 
 def process_earnings_for_order_item(db: Session, order_item: OrderItem):
     """
@@ -223,103 +218,6 @@ class OrderService(BaseService):
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
         return order
-
-    def generate_order_zip(self, public_id: str) -> StreamingResponse:
-        """
-        Generates a ZIP file containing all photos from an order.
-        Uses boto3 to fetch images directly from S3 (no presigned URLs).
-        Optimized for iOS Safari (single download).
-        
-        Returns:
-            StreamingResponse with ZIP file content.
-        """
-        # Fetch order with all photos
-        order = self.get_order_by_public_id(public_id)
-        
-        if not order.items:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Order has no photos to download"
-            )
-        
-        # Collect unique photos (avoid duplicates if same photo in multiple items)
-        photos_dict = {}
-        for item in order.items:
-            if item.photo and item.photo.object_name:
-                photos_dict[item.photo.id] = item.photo
-        
-        if not photos_dict:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No photos available in this order"
-            )
-        
-        photos = list(photos_dict.values())
-        
-        def generate_zip():
-            """Generator that yields ZIP chunks for streaming."""
-            zip_buffer = io.BytesIO()
-            
-            try:
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                    for index, photo in enumerate(photos):
-                        try:
-                            # Fetch image from S3 using boto3 (direct access, no presigned URL)
-                            obj = storage_service.s3_client.get_object(
-                                Bucket=storage_service.bucket_name,
-                                Key=photo.object_name
-                            )
-                            image_bytes = obj['Body'].read()
-                            
-                            # Generate safe filename
-                            # Use photo description/place if available, otherwise use photo ID
-                            base_name = (photo.place or photo.description or f"photo-{photo.id}").strip()
-                            # Sanitize filename (remove special chars)
-                            safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in base_name)
-                            safe_name = safe_name[:100]  # Limit length
-                            
-                            # Add index to ensure uniqueness
-                            filename = f"{safe_name}_{photo.id}.jpg"
-                            
-                            # Add to ZIP
-                            zf.writestr(filename, image_bytes)
-                            logging.info(f"Added {filename} to ZIP for order {public_id}")
-                            
-                        except Exception as e:
-                            # Log error but continue (skip problematic photos)
-                            logging.error(
-                                f"Error fetching photo {photo.id} ({photo.object_name}) "
-                                f"for order {public_id}: {str(e)}"
-                            )
-                            continue
-                
-                # Get ZIP content and yield it
-                zip_buffer.seek(0)
-                yield zip_buffer.getvalue()
-                
-            except Exception as e:
-                logging.error(f"Error generating ZIP for order {public_id}: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to generate ZIP file"
-                )
-        
-        # Generate filename based on order and album name if available
-        album_name = "fotos"
-        if order.items and order.items[0].photo and order.items[0].photo.session:
-            album_name = order.items[0].photo.session.event_name or "fotos"
-        
-        # Sanitize album name for filename
-        safe_album = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in album_name)[:50]
-        zip_filename = f"{safe_album}.zip"
-        
-        return StreamingResponse(
-            generate_zip(),
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{zip_filename}"'
-            }
-        )
         
     def process_earnings_for_order(self, order: Order):
         """
