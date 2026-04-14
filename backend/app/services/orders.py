@@ -25,7 +25,6 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem, adjustme
     if not order_item.photo:
         db.refresh(order_item, attribute_names=['photo'])
 
-    # If photo is still None (e.g., data integrity issue), log and skip.
     if not order_item.photo:
         print(f"WARNING: Skipping earning for OrderItem ID {order_item.id} because its associated Photo ID {order_item.photo_id} could not be found.")
         return
@@ -34,27 +33,25 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem, adjustme
     if not order_item.photo.photographer:
         db.refresh(order_item.photo, attribute_names=['photographer'])
         
-    # If photographer is still not loaded, log and skip.
     if not order_item.photo.photographer:
         print(f"WARNING: Skipping earning for OrderItem ID {order_item.id} because the associated Photo ID {order_item.photo.id} has no photographer.")
         return
 
     photographer = order_item.photo.photographer
-    # item_price is the effective price considering the adjustment factor
-    item_price = (order_item.price * order_item.quantity) * adjustment_factor
     commission_percentage = photographer.commission_percentage
 
-    # The actual monetary value for this item is exactly item_price
-    real_value_of_item = item_price
-
     # Calculate real photos sold based on the quantity and the adjustment factor.
-    # This represents the gross proportion of photos paid by the customer.
+    # This represents the gross proportion of photos paid by the customer (Venta Real).
     real_photos_sold = float(order_item.quantity) * adjustment_factor
+
+    # The actual monetary value for this item is exactly item_price
+    item_price = (order_item.price * order_item.quantity) * adjustment_factor
+    real_value_of_item = item_price
 
     # Monetary earning calculation
     earned_amount = real_value_of_item * (commission_percentage / 100.0)
 
-    # Photo fraction earning calculation (this is what the photographer actually 'earns')
+    # Photo fraction earning calculation (this is what the photographer actually 'earns' - Ganancia Neta)
     earned_photo_fraction = real_photos_sold * (commission_percentage / 100.0)
 
     new_earning = Earning(

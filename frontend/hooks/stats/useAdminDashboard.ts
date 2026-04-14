@@ -10,14 +10,20 @@ interface DashboardFilters {
   photographerId?: string;
 }
 
-export function useAdminDashboard(filters: DashboardFilters = {}) {
+export function useAdminDashboard(filters: DashboardFilters = {}, options: { enabled?: boolean } = { enabled: true }) {
   const { startDate, endDate, photographerId } = filters;
+  const { enabled } = options;
   const [data, setData] = useState<AdminDashboardSchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchIdRef = useRef(0);
 
   const fetchDashboardData = useCallback(async () => {
+    if (enabled === false) {
+      setLoading(false);
+      return;
+    }
+    
     const currentFetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
@@ -45,7 +51,7 @@ export function useAdminDashboard(filters: DashboardFilters = {}) {
         setLoading(false);
       }
     }
-  }, [startDate, endDate, photographerId]);
+  }, [startDate, endDate, photographerId, enabled]);
 
   useEffect(() => {
     fetchDashboardData();
