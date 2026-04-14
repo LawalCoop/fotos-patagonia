@@ -28,10 +28,15 @@ class AlbumService(BaseService):
                 if first_session.photos and len(first_session.photos) > 0:
                     first_photo = first_session.photos[0]
                     if first_photo.object_name:
-                        # Create thumbnail object name pattern to match the frontend expectations
-                        base_name = first_photo.object_name.rsplit('.', 1)[0]
-                        ext = first_photo.object_name.rsplit('.', 1)[1] if '.' in first_photo.object_name else 'jpg'
-                        thumb_name = f"{base_name}_thumb.{ext}"
+                        # Match frontend logic: photos/abc.png -> photos/thumb_abc.png
+                        object_name = first_photo.object_name
+                        last_slash = object_name.rfind('/')
+                        if last_slash >= 0:
+                            dir_part = object_name[:last_slash + 1]
+                            base_name = object_name[last_slash + 1:]
+                            thumb_name = f"{dir_part}thumb_{base_name}"
+                        else:
+                            thumb_name = f"thumb_{object_name}"
                         
                         # Generate URL
                         url = storage_service.generate_presigned_get_url(thumb_name, expiration=3600)
