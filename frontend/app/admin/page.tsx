@@ -123,7 +123,16 @@ export default function AdminDashboard() {
 
   const stats = useMemo(() => {
     if (!dashboardData) {
-      return { totalOrders: 0, totalPhotos: 0, totalPhotosSold: 0, totalRealPhotos: 0, totalRevenue: 0, ordersByPaymentMethod: {} };
+      return { 
+        totalOrders: 0, 
+        totalPhotos: 0, 
+        totalPhotosSold: 0, 
+        totalRealPhotos: 0, 
+        totalRevenue: 0, 
+        totalPayout: 0,
+        netRevenue: 0,
+        ordersByPaymentMethod: {} 
+      };
     }
     return {
       totalOrders: dashboardData.total_orders,
@@ -131,6 +140,8 @@ export default function AdminDashboard() {
       totalPhotosSold: dashboardData.total_photos_sold,
       totalRealPhotos: dashboardData.total_real_photos_sold,
       totalRevenue: dashboardData.total_gross_revenue,
+      totalPayout: dashboardData.total_commissions,
+      netRevenue: dashboardData.total_net_revenue,
       ordersByPaymentMethod: dashboardData.orders_by_payment_method,
     };
     }, [dashboardData]);
@@ -227,7 +238,40 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
-      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <Card className="border-blue-100 bg-blue-50/30">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Ingresos Brutos</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-900">${stats.totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-blue-600/70 mt-1">Total abonado por clientes</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-100 bg-orange-50/30">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-orange-700">A Pagar (Fotógrafos)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-900">${stats.totalPayout.toLocaleString()}</div>
+            <p className="text-xs text-orange-600/70 mt-1">Comisiones para liquidar</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-100 bg-green-50/30">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Ingreso Neto</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-900">${stats.netRevenue.toLocaleString()}</div>
+            <p className="text-xs text-green-600/70 mt-1">Ganancia de la plataforma</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
@@ -235,8 +279,10 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalOrders}</div>
+            <p className="text-xs text-muted-foreground mt-1">Órdenes cobradas</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Fotos Totales Vendidas</CardTitle>
@@ -244,8 +290,10 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalPhotosSold}</div>
+            <p className="text-xs text-muted-foreground mt-1">Archivos digitales entregados</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Fotos Reales Vendidas</CardTitle>
@@ -253,33 +301,27 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-primary">{stats.totalRealPhotos.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Ajustado por combos/desc.</p>
+            <p className="text-xs text-muted-foreground mt-1">Ajustado por descuentos/promos</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-        <Card>
+
+        <Card className="lg:col-span-2 xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Ventas por medio de pago</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {stats.ordersByPaymentMethod && Object.keys(stats.ordersByPaymentMethod).length > 0 ? (
-              Object.entries(stats.ordersByPaymentMethod).map(([method, count]) => (
-                <div key={method} className="flex justify-between items-center text-sm">
-                  <span className="capitalize">{method}</span>
-                  <span className="font-bold">{count}</span>
-                </div>
-              ))
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                {Object.entries(stats.ordersByPaymentMethod).map(([method, count]) => (
+                  <div key={method} className="flex justify-between items-center text-sm border-b border-gray-100 pb-1">
+                    <span className="capitalize text-muted-foreground">{method}</span>
+                    <span className="font-bold">{count}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No hay datos</p>
+              <p className="text-sm text-muted-foreground">No hay datos de pagos para este periodo</p>
             )}
           </CardContent>
         </Card>

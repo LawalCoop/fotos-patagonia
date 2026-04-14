@@ -119,21 +119,27 @@ class AdminService(BaseService):
         photographer_stats = commission_summary_query.all()
 
         commissions_by_photographer: List[AdminCommissionSummary] = []
-        total_commissions = 0.0
+        total_platform_commission = 0.0
+        total_photographer_payout = 0.0
+        
         for p_record, gross, net in photographer_stats:
             gross_sales = gross or 0
-            net_earnings = net or 0
-            commission = gross_sales - net_earnings
-            total_commissions += commission
+            photographer_net = net or 0
+            platform_cut = gross_sales - photographer_net
+            
+            total_platform_commission += platform_cut
+            total_photographer_payout += photographer_net
             
             commissions_by_photographer.append(
                 AdminCommissionSummary(
                     photographer_id=p_record.id,
                     photographer_name=p_record.name,
-                    total_commission=round(commission, 2),
+                    total_commission=round(platform_cut, 2),
                     total_gross_sales=round(gross_sales, 2)
                 )
             )
+
+        total_gross_revenue = global_stats.total_gross_revenue or 0.0
 
         # --- 3. Assemble final schema ---
         return AdminDashboardSchema(
@@ -141,8 +147,9 @@ class AdminService(BaseService):
             total_photos_sold=total_photos_sold or 0,
             total_real_photos_sold=round(total_real_photos_sold, 2),
             total_orders=global_stats.total_orders or 0,
-            total_gross_revenue=round(global_stats.total_gross_revenue or 0, 2),
-            total_commissions=round(total_commissions, 2),
+            total_gross_revenue=round(total_gross_revenue, 2),
+            total_commissions=round(total_photographer_payout, 2), # This is what you pay out
+            total_net_revenue=round(total_gross_revenue - total_photographer_payout, 2), # This is what you keep
             orders_by_payment_method=orders_by_payment_method,
             commissions_by_photographer=commissions_by_photographer,
         )

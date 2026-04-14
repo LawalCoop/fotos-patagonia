@@ -16,6 +16,7 @@ class AdminDashboardSchema(BaseModel):
     total_orders: int
     total_gross_revenue: float
     total_commissions: float # Sum of all commissions paid out
+    total_net_revenue: float # total_gross_revenue - total_commissions
     orders_by_payment_method: Dict[str, int] = Field(default_factory=dict)
     commissions_by_photographer: List[AdminCommissionSummary]
 

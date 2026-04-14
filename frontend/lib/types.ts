@@ -405,6 +405,7 @@ export interface AdminDashboardSchema {
   total_orders: number;
   total_gross_revenue: number;
   total_commissions: number;
+  total_net_revenue: number;
   orders_by_payment_method: Record<string, number>;
   commissions_by_photographer: AdminCommissionSummary[];
 }
