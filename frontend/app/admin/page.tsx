@@ -49,9 +49,9 @@ export default function AdminDashboard() {
   });
   const [hasAutoFiltered, setHasAutoFiltered] = useState(false);
 
-  const canViewAnyEarnings = user && getUserRoleName(user) === "Administrador";
+  const isUserAdmin = isAdmin(user);
 
-  const { data: dashboardData, loading: dashboardLoading } = useAdminDashboard(appliedFilters, { enabled: !!canViewAnyEarnings });
+  const { data: dashboardData, loading: dashboardLoading } = useAdminDashboard(appliedFilters, { enabled: isUserAdmin });
 
   const orderFilters = useMemo(() => {
     const filters: any = { limit: 5 };
