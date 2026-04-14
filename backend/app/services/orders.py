@@ -44,9 +44,10 @@ def process_earnings_for_order_item(db: Session, order_item: OrderItem, adjustme
     # This represents the gross proportion of photos paid by the customer (Venta Real).
     real_photos_sold = float(order_item.quantity) * adjustment_factor
 
-    # The actual monetary value for this item is exactly item_price
-    item_price = (order_item.price * order_item.quantity) * adjustment_factor
-    real_value_of_item = item_price
+    # Calculate the real monetary value using the original photo price and the adjustment factor.
+    # This prevents 'double discounting' if order_item.price was already modified.
+    photo_price = order_item.photo.price if (order_item.photo and order_item.photo.price) else order_item.price
+    real_value_of_item = (photo_price * order_item.quantity) * adjustment_factor
 
     # Monetary earning calculation
     earned_amount = real_value_of_item * (commission_percentage / 100.0)
