@@ -239,17 +239,26 @@ class OrderService(BaseService):
         if not order or not order.items:
             return
 
-        # Calculate adjustment factor if there's a manual override or discount
-        # We compare the current order.subtotal (which may be overridden) 
-        # with the sum of (item.price * item.quantity)
-        nominal_subtotal = sum((item.price * item.quantity) for item in order.items if item.format is None)
+        # Calculate adjustment factor based on what the customer ACTUALLY paid (order.total)
+        # versus the true original price of the photos (photo.price)
+        # This prevents double-discounting issues or upside-down overrides.
+        
+        true_nominal_subtotal = 0.0
+        for item in order.items:
+            if item.format is None and item.photo and item.photo.price:
+                true_nominal_subtotal += (item.photo.price * item.quantity)
+            elif item.format is None:
+                # Fallback if photo has no price
+                true_nominal_subtotal += (item.price * item.quantity)
         
         adjustment_factor = 1.0
-        if nominal_subtotal > 0 and order.subtotal is not None:
-            adjustment_factor = order.subtotal / nominal_subtotal
+        
+        # We use order.total (the final amount to be paid after everything)
+        if true_nominal_subtotal > 0 and order.total is not None:
+            adjustment_factor = order.total / true_nominal_subtotal
             
             if abs(adjustment_factor - 1.0) > 0.001:
-                print(f"INFO: Applying adjustment factor of {adjustment_factor:.4f} to earnings for order {order.id} due to subtotal override ({order.subtotal} vs {nominal_subtotal})")
+                print(f"INFO: Applying adjustment factor of {adjustment_factor:.4f} to earnings for order {order.id} (Paid: {order.total} vs True Nominal: {true_nominal_subtotal})")
 
         for item in order.items:
             # Skip physical prints for digital earnings calculation if necessary, 
