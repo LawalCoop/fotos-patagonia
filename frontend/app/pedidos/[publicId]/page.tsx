@@ -224,16 +224,26 @@ export default function PublicOrderDetailPage() {
     setIsIOS(checkIOS())
   }, [])
 
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
+
   const handleDownloadAll = async () => {
     if (!digitalOrderPhotos.length || isDownloading) return;
-  
+    setDebugInfo(null)
     setIsDownloading(true);
+    
     try {
       if (isIOS) {
-        // En iOS, usamos el endpoint de ZIP porque Safari bloquea múltiples descargas
+        // Log para depuración en el dispositivo del cliente
         const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
         const url = `${baseUrl}/orders/public/${publicId}/download-zip`;
-        window.open(url, "_blank", "noopener,noreferrer");
+        
+        console.log("Iniciando descarga iOS:", url);
+        
+        // Usamos assign para que Safari no lo bloquee como popup
+        window.location.assign(url);
+        
+        // Soltamos el loading después de un tiempo
+        setTimeout(() => setIsDownloading(false), 5000);
       } else {
         // En otros navegadores, descargamos una por una (comportamiento original)
         const downloadPromises = digitalOrderPhotos.map(async (photo) => {
@@ -241,14 +251,15 @@ export default function PublicOrderDetailPage() {
           if (!url) return;
     
           await triggerFileDownload(url, buildPhotoFilename(photo));
-          // Pausa mínima para evitar bloqueo del navegador en descargas sucesivas
           await new Promise((r) => setTimeout(r, 300));
         });
         await Promise.all(downloadPromises);
+        setIsDownloading(false);
       }
-    } catch (error) {
-      console.error("Error descargando fotos", error);
-    } finally {
+    } catch (error: any) {
+      const errorMsg = `Error: ${error.message || "Desconocido"}. URL: ${process.env.NEXT_PUBLIC_API_URL}`;
+      console.error("Download error:", error);
+      setDebugInfo(errorMsg);
       setIsDownloading(false);
     }
   };
@@ -370,6 +381,13 @@ export default function PublicOrderDetailPage() {
                 <Download className="mr-2 h-5 w-5" />
                 {isDownloading ? "Preparando descarga..." : isIOS ? "Descargar todas en un archivo (.ZIP)" : `Descargar Todas las Fotos (${digitalOrderPhotos.length})`}
               </Button>
+              {debugInfo && (
+                <div className="mt-4 rounded-lg bg-red-500/10 p-3 border border-red-200">
+                  <p className="text-[10px] font-mono text-red-600 break-all leading-tight">
+                    DEBUG: {debugInfo}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

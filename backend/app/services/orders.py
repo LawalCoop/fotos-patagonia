@@ -363,8 +363,10 @@ class OrderService(BaseService):
         # Business logic for generating QR code for an order
         return {"message": f"OrderService: Generate QR code for order {order_id} logic"}
     def generate_order_zip(self, public_id: str) -> StreamingResponse:
+        logging.info(f"Starting ZIP generation for order: {public_id}")
         order = self.get_order_by_public_id(public_id)
         if not order.items:
+            logging.error(f"Order {public_id} has no items")
             raise HTTPException(status_code=400, detail="Order has no photos to download")
 
         photos_dict = {}
@@ -373,32 +375,42 @@ class OrderService(BaseService):
                 photos_dict[item.photo.id] = item.photo
 
         if not photos_dict:
+            logging.error(f"Order {public_id} has no valid photos in DB")
             raise HTTPException(status_code=400, detail="No valid photos available in this order")
 
         photos = list(photos_dict.values())
+        logging.info(f"Found {len(photos)} unique photos for order {public_id}")
 
         def iter_zip():
             zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for photo in photos:
-                    try:
-                        obj = storage_service.s3_client.get_object(
-                            Bucket=storage_service.bucket_name,
-                            Key=photo.object_name
-                        )
-                        image_bytes = obj['Body'].read()
-                        
-                        base_name = (photo.place or photo.description or f"foto-{photo.id}").strip()
-                        safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in base_name)[:100]
-                        filename = f"{safe_name}_{photo.id}.jpg"
-                        
-                        zf.writestr(filename, image_bytes)
-                    except Exception as e:
-                        logging.error(f"Error fetching photo {photo.id} for ZIP: {e}")
-                        continue
+            try:
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    for i, photo in enumerate(photos):
+                        try:
+                            logging.info(f"[{i+1}/{len(photos)}] Fetching {photo.object_name} from S3")
+                            obj = storage_service.s3_client.get_object(
+                                Bucket=storage_service.bucket_name,
+                                Key=photo.object_name
+                            )
+                            image_bytes = obj['Body'].read()
+                            
+                            base_name = (photo.place or photo.description or f"foto-{photo.id}").strip()
+                            safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in base_name)[:100]
+                            filename = f"{safe_name}_{photo.id}.jpg"
+                            
+                            zf.writestr(filename, image_bytes)
+                            logging.info(f"Successfully added {filename} to ZIP")
+                        except Exception as e:
+                            logging.error(f"Error adding photo {photo.id} to ZIP: {str(e)}")
+                            continue
 
-            zip_buffer.seek(0)
-            yield zip_buffer.getvalue()
+                logging.info(f"Finished ZIP creation for {public_id}, streaming to client...")
+                zip_buffer.seek(0)
+                yield zip_buffer.getvalue()
+            except Exception as e:
+                logging.error(f"Critical error during ZIP iteration for {public_id}: {str(e)}")
+            finally:
+                zip_buffer.close()
 
         album_name = "fotos"
         if order.items and order.items[0].photo and order.items[0].photo.session:
@@ -410,5 +422,8 @@ class OrderService(BaseService):
         return StreamingResponse(
             iter_zip(),
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+            headers={
+                "Content-Disposition": f"attachment; filename={zip_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
         )
