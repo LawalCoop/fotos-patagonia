@@ -366,6 +366,7 @@ export interface PhotoCombo {
 
 // Para listados (público + admin)
 export interface AlbumListItem {
+  coverPhotoUrl?: string
   id: number
   name: string
   description?: string | null

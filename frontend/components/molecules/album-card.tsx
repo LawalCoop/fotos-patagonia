@@ -36,9 +36,15 @@ export function AlbumCard({ album }: { album: AlbumListItem }) {
   }, [isVisible]);
 
   const thumbObjectName = buildThumbObjectName(album.coverPhotoObjectName);
-  const { url: coverPhotoUrl, loading: isLoading } = usePresignedUrl(thumbObjectName, {
-    enabled: isVisible,
+  
+  // Conditionally skip the hook's API call if we already have the URL from the backend
+  const { url: fetchedUrl, loading: isFetching } = usePresignedUrl(thumbObjectName, {
+    enabled: isVisible && !album.coverPhotoUrl, // Skip fetch if we already have it!
   });
+
+  // Decide which URL and loading state to use
+  const coverPhotoUrl = album.coverPhotoUrl || fetchedUrl;
+  const isLoading = !album.coverPhotoUrl && isFetching;
 
   const hasPhotos = album.photoCount > 0;
   const photoLabel = hasPhotos ? album.photoCount : "Sin fotos";
