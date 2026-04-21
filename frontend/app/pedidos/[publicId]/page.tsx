@@ -114,6 +114,19 @@ export default function PublicOrderDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
 
+   // iOS detection state
+   const [isIOS, setIsIOS] = useState(false)
+
+   useEffect(() => {
+     const checkIOS = () => {
+       if (typeof navigator === "undefined") return false
+       return /iPad|iPhone|iPod/.test(navigator.userAgent)
+     }
+     setIsIOS(checkIOS())
+   }, [])
+ 
+   const [debugInfo, setDebugInfo] = useState<string | null>(null)
+   
   useEffect(() => {
     if (publicId) {
       const fetchOrder = async () => {
@@ -212,19 +225,6 @@ export default function PublicOrderDetailPage() {
     )
   }
 
-
-  // iOS detection state
-  const [isIOS, setIsIOS] = useState(false)
-
-  useEffect(() => {
-    const checkIOS = () => {
-      if (typeof navigator === "undefined") return false
-      return /iPad|iPhone|iPod/.test(navigator.userAgent)
-    }
-    setIsIOS(checkIOS())
-  }, [])
-
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   const handleDownloadAll = async () => {
     if (!digitalOrderPhotos.length || isDownloading) return;
