@@ -310,6 +310,51 @@ export default function PublicOrderDetailPage() {
             )}
           </Card>
 
+          {/* Semántica de ítems para futuras vistas de UI */}
+        {/*   <Card className="mb-6 rounded-2xl border-gray-200 shadow-lg">
+            <CardHeader>
+              <CardTitle>Detalle de ítems</CardTitle>
+              <CardDescription>
+                Separá en UI: fotos digitales vs ítems de impresión 
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <p className="font-semibold text-muted-foreground">Fotos digitales</p>
+                {digitalItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No hay ítems digitales registrados.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {digitalItems.map((item) => (
+                      <li key={item.id} className="flex justify-between">
+                        <span>{item.photo?.description || `Foto ${item.photo_id}`}</span>
+                        <span className="font-semibold">${item.price}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold text-muted-foreground">Fotos para impresión</p>
+                {printItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin impresiones asociadas.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {printItems.map((item) => (
+                      <li key={item.id} className="flex justify-between">
+                        <span>
+                          {item.photo?.description || `Foto ${item.photo_id}`}{item.format && ` • Formato: ${item.format}`}
+                        </span>
+                        <span className="font-semibold">${item.price}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </CardContent>
+          </Card> */}
+
           {/* Download All Button - Mostrar solo si está pagado/completado */}
           {isPaidOrCompleted && (
             <div className="mb-6">
