@@ -15,67 +15,9 @@ import { apiFetch } from "@/lib/api"
 import Image from "next/image"
 import { Logo } from "@/components/atoms/logo"
 import { formatDateTime } from "@/lib/datetime"
+import WatermarkedImage from "@/components/organisms/WatermarkedImage"
 
-// Define un tipo para el pedido que incluye los detalles de las fotos en los items
-// Usamos OrderItemPhoto directamente, ya que ahora el backend las devuelve con url y watermark_url
-type OrderWithPublicPhotoItems = Omit<Order, "items"> & {
-  items: Array<Omit<OrderItem, "photo"> & { photo: OrderItemPhoto }>
-}
-
-const buildPhotoFilename = (photo: OrderItemPhoto) => {
-  const sanitizedDescription = photo.description?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `foto-${photo.id}`
-  return `${sanitizedDescription}.jpg`
-}
-
-// Heurística para separar ítems digitales vs impresión sin romper pedidos existentes.
-const splitOrderItems = (items: OrderItem[]) => {
-  const digital: OrderItem[] = [];
-  const print: OrderItem[] = [];
-
-  items.forEach(item => {
-
-    if (item.format) {
-      print.push(item);
-    } else {
-      digital.push(item);
-    }
-  });
-
-  return { digital, print };
-};
-
-/* const triggerFileDownload = (url: string, filename: string) => {
-  if (!url || typeof document === "undefined") return
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = filename
-  anchor.target = "_blank"
-  anchor.rel = "noopener noreferrer" // Seguridad
-  document.body.appendChild(anchor)
-  anchor.click()
-  document.body.removeChild(anchor)
-}
- */
-const triggerFileDownload = async (url: string, filename: string) => {
-  try {
-    const response = await fetch(url, { credentials: "omit" });
-    if (!response.ok) throw new Error("Error al descargar archivo");
-
-    const blob = await response.blob();
-    const objectUrl = window.URL.createObjectURL(blob);
-
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-
-    document.body.removeChild(anchor);
-    window.URL.revokeObjectURL(objectUrl);
-  } catch (error) {
-    console.error("Download failed", error);
-  }
-};
+// ... (rest of the file remains similar until PhotoGridItem)
 
 function PhotoGridItem({ photo }: { photo: OrderItemPhoto }) {
   // El backend ya debería proveer photo.url y photo.watermark_url
@@ -84,15 +26,15 @@ function PhotoGridItem({ photo }: { photo: OrderItemPhoto }) {
 
   return (
     <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-muted">
-      {/* Usar Image de Next.js para optimización */}
-      <Image
+      <WatermarkedImage
         src={imageUrl}
         alt={photo.description || "Foto"}
         fill
         objectFit="cover"
         className="transition-transform group-hover:scale-105"
+        showWatermark={false} // El usuario ya compró la foto, no queremos marca de agua
       />
-      <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
           size="sm"
           onClick={() => triggerFileDownload(imageUrl, buildPhotoFilename(photo))}

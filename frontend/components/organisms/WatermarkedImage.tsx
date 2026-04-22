@@ -53,20 +53,31 @@ export default function WatermarkedImage({
 
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
+    <div 
+      className={cn("relative w-full h-full select-none", className)}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {/* 1. Capa de protección invisible (captura clics y arrastres) */}
+      <div 
+        className="absolute inset-0 z-20 cursor-default touch-none" 
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+      />
+
       {/* Imagen original (sin marca guardada físicamente) */}
       <Image
         src={src}
         alt={alt}
         fill={fill}
-        className={`object-${objectFit}`}
+        className={`object-${objectFit} pointer-events-none`}
         sizes={sizes}
         priority={priority}
+        draggable={false}
       />
 
       {/* Overlay de marca de agua (solo para usuarios públicos/visitantes) */}
       {shouldShowWatermark && (
-        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
+        <div className="absolute inset-0 z-10 pointer-events-none select-none overflow-hidden">
           {/* Patrón de marca de agua repetido */}
           <div
             className="absolute inset-0"
