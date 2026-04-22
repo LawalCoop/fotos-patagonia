@@ -358,13 +358,21 @@ export function PhotoViewerModal({ photo,  nextPhoto, onClose, onNext, onPrev }:
 
     {/* Imagen alta calidad */}
     {originalUrl && (
-      <img
-        src={originalUrl}
-        alt={`Foto en alta resolución de ${photo.place || "Patagonia"}`}
-        className="max-h-screen max-w-screen object-contain"
-        draggable={false}
-        onContextMenu={(e) => e.preventDefault()}
-      />
+      <div className="relative h-full w-full flex items-center justify-center">
+        {/* Capa de protección invisible */}
+        <div 
+          className="absolute inset-0 z-10 cursor-default" 
+          onContextMenu={(e) => e.preventDefault()}
+          onDragStart={(e) => e.preventDefault()}
+        />
+        <img
+          src={originalUrl}
+          alt={`Foto en alta resolución de ${photo.place || "Patagonia"}`}
+          className="max-h-screen max-w-screen object-contain pointer-events-none select-none"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      </div>
     )}
 
     {!originalUrl && (

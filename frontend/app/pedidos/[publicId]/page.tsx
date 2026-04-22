@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api"
 import Image from "next/image"
 import { Logo } from "@/components/atoms/logo"
 import { formatDateTime } from "@/lib/datetime"
+import WatermarkedImage from "@/components/organisms/WatermarkedImage"
 
 // Define un tipo para el pedido que incluye los detalles de las fotos en los items
 // Usamos OrderItemPhoto directamente, ya que ahora el backend las devuelve con url y watermark_url
@@ -44,18 +45,6 @@ const splitOrderItems = (items: OrderItem[]) => {
   return { digital, print };
 };
 
-/* const triggerFileDownload = (url: string, filename: string) => {
-  if (!url || typeof document === "undefined") return
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = filename
-  anchor.target = "_blank"
-  anchor.rel = "noopener noreferrer" // Seguridad
-  document.body.appendChild(anchor)
-  anchor.click()
-  document.body.removeChild(anchor)
-}
- */
 const triggerFileDownload = async (url: string, filename: string) => {
   try {
     const response = await fetch(url, { credentials: "omit" });
@@ -84,15 +73,15 @@ function PhotoGridItem({ photo }: { photo: OrderItemPhoto }) {
 
   return (
     <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-muted">
-      {/* Usar Image de Next.js para optimización */}
-      <Image
+      <WatermarkedImage
         src={imageUrl}
         alt={photo.description || "Foto"}
         fill
         objectFit="cover"
         className="transition-transform group-hover:scale-105"
+        showWatermark={false} // El usuario ya compró la foto, no queremos marca de agua
       />
-      <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
           size="sm"
           onClick={() => triggerFileDownload(imageUrl, buildPhotoFilename(photo))}
@@ -174,10 +163,6 @@ export default function PublicOrderDetailPage() {
     }
     return statusConfig[status as keyof typeof statusConfig]
   }
-
- /*  const allOrderPhotos = (order?.items ?? [])
-    .map((item) => item.photo)
-    .filter((photo): photo is NonNullable<OrderItemPhoto> => Boolean(photo)) */
 
     const digitalOrderPhotos = useMemo(() => {
       if (!order?.items) return [];
