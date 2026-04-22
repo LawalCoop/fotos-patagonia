@@ -17,7 +17,54 @@ import { Logo } from "@/components/atoms/logo"
 import { formatDateTime } from "@/lib/datetime"
 import WatermarkedImage from "@/components/organisms/WatermarkedImage"
 
-// ... (rest of the file remains similar until PhotoGridItem)
+// Define un tipo para el pedido que incluye los detalles de las fotos en los items
+// Usamos OrderItemPhoto directamente, ya que ahora el backend las devuelve con url y watermark_url
+type OrderWithPublicPhotoItems = Omit<Order, "items"> & {
+  items: Array<Omit<OrderItem, "photo"> & { photo: OrderItemPhoto }>
+}
+
+const buildPhotoFilename = (photo: OrderItemPhoto) => {
+  const sanitizedDescription = photo.description?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `foto-${photo.id}`
+  return `${sanitizedDescription}.jpg`
+}
+
+// Heurística para separar ítems digitales vs impresión sin romper pedidos existentes.
+const splitOrderItems = (items: OrderItem[]) => {
+  const digital: OrderItem[] = [];
+  const print: OrderItem[] = [];
+
+  items.forEach(item => {
+
+    if (item.format) {
+      print.push(item);
+    } else {
+      digital.push(item);
+    }
+  });
+
+  return { digital, print };
+};
+
+const triggerFileDownload = async (url: string, filename: string) => {
+  try {
+    const response = await fetch(url, { credentials: "omit" });
+    if (!response.ok) throw new Error("Error al descargar archivo");
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    console.error("Download failed", error);
+  }
+};
 
 function PhotoGridItem({ photo }: { photo: OrderItemPhoto }) {
   // El backend ya debería proveer photo.url y photo.watermark_url
@@ -116,10 +163,6 @@ export default function PublicOrderDetailPage() {
     }
     return statusConfig[status as keyof typeof statusConfig]
   }
-
- /*  const allOrderPhotos = (order?.items ?? [])
-    .map((item) => item.photo)
-    .filter((photo): photo is NonNullable<OrderItemPhoto> => Boolean(photo)) */
 
     const digitalOrderPhotos = useMemo(() => {
       if (!order?.items) return [];
@@ -266,51 +309,6 @@ export default function PublicOrderDetailPage() {
               </CardContent>
             )}
           </Card>
-
-          {/* Semántica de ítems para futuras vistas de UI */}
-        {/*   <Card className="mb-6 rounded-2xl border-gray-200 shadow-lg">
-            <CardHeader>
-              <CardTitle>Detalle de ítems</CardTitle>
-              <CardDescription>
-                Separá en UI: fotos digitales vs ítems de impresión 
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div>
-                <p className="font-semibold text-muted-foreground">Fotos digitales</p>
-                {digitalItems.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No hay ítems digitales registrados.</p>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {digitalItems.map((item) => (
-                      <li key={item.id} className="flex justify-between">
-                        <span>{item.photo?.description || `Foto ${item.photo_id}`}</span>
-                        <span className="font-semibold">${item.price}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div>
-                <p className="font-semibold text-muted-foreground">Fotos para impresión</p>
-                {printItems.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin impresiones asociadas.</p>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {printItems.map((item) => (
-                      <li key={item.id} className="flex justify-between">
-                        <span>
-                          {item.photo?.description || `Foto ${item.photo_id}`}{item.format && ` • Formato: ${item.format}`}
-                        </span>
-                        <span className="font-semibold">${item.price}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </CardContent>
-          </Card> */}
 
           {/* Download All Button - Mostrar solo si está pagado/completado */}
           {isPaidOrCompleted && (
