@@ -1,0 +1,85 @@
+name: Build & push images (on tag)
+
+# Se dispara SOLO cuando se crea un tag (ej: v0.1.0).
+# Publica una imagen "oficial" del backend y del frontend en GHCR,
+# etiquetadas con la versión del tag + "latest".
+on:
+  push:
+    tags:
+      - "*"
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write # necesario para publicar en GHCR
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            image: fotopatagonia-backend
+            build_args: ""
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile.prod
+            image: fotopatagonia-frontend
+            # El frontend "quema" estas variables públicas al construir la imagen.
+            # Se configuran en el repo (Settings > Secrets and variables > Actions > Variables).
+            build_args: |
+              NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+              NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${{ vars.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+              NEXT_PUBLIC_EMAILJS_SERVICE_ID=${{ vars.NEXT_PUBLIC_EMAILJS_SERVICE_ID }}
+              NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=${{ vars.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID }}
+              NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR exige que el nombre del owner esté en minúsculas.
+      - name: Normalizar owner a minúsculas
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Genera automáticamente las etiquetas (tag de la versión + latest).
+      - name: Metadata (tags / labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build & push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
