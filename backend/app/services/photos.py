@@ -296,7 +296,7 @@ class PhotoService(BaseService):
         updated_photo = self._save_and_refresh(db_photo)
         return self._generate_presigned_urls(updated_photo)
 
-    def finalize_photo_uploads(self, completion_requests: List[PhotoCompletionRequest], current_user: User, album_id: int | None = None) -> List[PhotoSchema]:
+    def finalize_photo_uploads(self, completion_requests: List[PhotoCompletionRequest], current_user: User, album_id: int | None = None, session_id: int | None = None) -> List[PhotoSchema]:
         from models.album import Album  # Importación local para evitar la dependencia circular
 
         if not completion_requests:
@@ -350,20 +350,31 @@ class PhotoService(BaseService):
 
         photographer_id = new_requests[0].photographer_id
 
-        try:
-            session_service = SessionService(self.db)
-            new_session_data = SessionCreateSchema(
-                event_name=f"Carga de fotos {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                description="Sesión generada automáticamente para un lote de carga de fotos.",
-                event_date=datetime.now(),
-                location="Carga en línea",
-                photographer_id=photographer_id,
-                album_id=album_id
-            )
-            new_session = session_service.create_session(session_in=new_session_data)
-            batch_session_id = new_session.id
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create photo session for batch: {str(e)}")
+        if session_id is not None:
+            # Carga incremental: reusar una sesión ya creada por una tanda previa.
+            existing_session = self.db.query(PhotoSession).filter(PhotoSession.id == session_id).first()
+            if existing_session is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Photo session {session_id} not found.")
+            if not can_edit_any:
+                owner_id = getattr(existing_session, "photographer_id", None)
+                if not current_user.photographer or owner_id != current_user.photographer.id:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to add photos to this session.")
+            batch_session_id = existing_session.id
+        else:
+            try:
+                session_service = SessionService(self.db)
+                new_session_data = SessionCreateSchema(
+                    event_name=f"Carga de fotos {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    description="Sesión generada automáticamente para un lote de carga de fotos.",
+                    event_date=datetime.now(),
+                    location="Carga en línea",
+                    photographer_id=photographer_id,
+                    album_id=album_id
+                )
+                new_session = session_service.create_session(session_in=new_session_data)
+                batch_session_id = new_session.id
+            except Exception as e:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create photo session for batch: {str(e)}")
 
         for photo_data in new_requests:
             if not can_edit_any:

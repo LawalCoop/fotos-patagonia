@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import { Header } from "@/components/organisms/header"
 import { useAlbums } from "@/hooks/albums/useAlbums"
@@ -37,6 +37,21 @@ export default function AlbumDetailPage() {
   const [selectedTag, setSelectedTag] = useState("all")
   const [sortBy, setSortBy] = useState<"recent" | "oldest">("recent")
   
+  // Polling cada ~7s (solo con pestaña visible): refresca el álbum en segundo
+  // plano (silent) para reflejar fotos agregadas sin recargar la página.
+  const refetchRef = useRef(refetch)
+  useEffect(() => {
+    refetchRef.current = refetch
+  }, [refetch])
+  useEffect(() => {
+    const POLL_MS = 7000
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return
+      refetchRef.current?.({ silent: true })
+    }, POLL_MS)
+    return () => clearInterval(timer)
+  }, [])
+
   // Transform backend data
   const album = albumData && !Array.isArray(albumData) ? albumData : null
   // Debug: registrar el orden crudo de sesiones recibido
@@ -330,7 +345,7 @@ export default function AlbumDetailPage() {
                 {error || "Álbum no encontrado"}
               </p>
               <div className="flex gap-4 justify-center">
-                <Button onClick={refetch}>Reintentar</Button>
+                <Button onClick={() => refetch()}>Reintentar</Button>
                 <Button variant="outline" asChild>
                   <Link href="/albumes">Volver a Álbumes</Link>
                 </Button>

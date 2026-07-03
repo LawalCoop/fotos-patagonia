@@ -278,6 +278,13 @@ export function PhotoModal({
         }
       });
       const optimisticTempIds = optimisticEntries.map((p) => p.tempId);
+      // Lista {tempId, nombre} de cada placeholder. La usamos en el barrido
+      // final para resolver TODOS los placeholders aunque haya nombres repetidos
+      // (donde el mapa nombre->tempId colapsaría y dejaría alguno colgado).
+      const optimisticFiles = optimisticEntries.map((entry, index) => ({
+        tempId: entry.tempId,
+        name: uploadedFiles[index]?.name ?? "",
+      }));
       if (optimisticEntries.length > 0) {
         onUploadStart?.(optimisticEntries);
       }
@@ -307,34 +314,46 @@ export function PhotoModal({
               onUploadProgress?.(optimisticTempIds, pct);
             }
           },
-          onComplete: async (createdPhotos, batchResult) => {
+          // Refleja en la galería las fotos creadas en esta tanda.
+          onBatchComplete: (chunk) => {
             const successTempIds: string[] = [];
             const failedTempIds: string[] = [];
-
-            const originals = batchResult?.originals ?? [];
-            originals.forEach((item) => {
+            chunk.originals.forEach((item) => {
               const tempId = filenameToTempId.get(item.filename);
               if (!tempId) return;
-              if (item.status === "success") {
-                successTempIds.push(tempId);
-              }
-              if (item.status === "failed") {
-                failedTempIds.push(tempId);
-              }
+              if (item.status === "success") successTempIds.push(tempId);
+              if (item.status === "failed") failedTempIds.push(tempId);
             });
-
-            batchResult?.failedFiles?.forEach((file) => {
+            chunk.failedFiles?.forEach((file) => {
               const tempId = filenameToTempId.get(file.name);
               if (tempId && !failedTempIds.includes(tempId)) {
                 failedTempIds.push(tempId);
               }
             });
-
-            const dedupSuccess =
-              successTempIds.length > 0
-                ? Array.from(new Set(successTempIds))
-                : optimisticTempIds;
-            const dedupFailed = Array.from(new Set(failedTempIds));
+            onUploadComplete?.({
+              success: Array.from(new Set(successTempIds)),
+              failed: Array.from(new Set(failedTempIds)),
+              createdPhotos: chunk.createdPhotos,
+            });
+          },
+          onComplete: async (createdPhotos, batchResult) => {
+            // Barrido final: garantizar que NINGÚN placeholder quede colgado.
+            // Marcamos como error solo los fallos REALES de subida (un duplicado
+            // no es un error: la foto ya está en el sistema). Todo lo demás
+            // (subidas ok, duplicados, o placeholders que no se pudieron mapear
+            // por tener nombre repetido) se resuelve y se saca de la vista.
+            const realFailedNames = new Set(
+              (batchResult?.failedFiles ?? [])
+                .filter((f) => !/duplicad/i.test(f.reason ?? ""))
+                .map((f) => f.name)
+            );
+            const dedupFailed = optimisticFiles
+              .filter((e) => realFailedNames.has(e.name))
+              .map((e) => e.tempId);
+            const failedSet = new Set(dedupFailed);
+            const dedupSuccess = optimisticTempIds.filter(
+              (id) => !failedSet.has(id)
+            );
 
             const status = batchResult?.status ?? "success";
             const failedFiles = batchResult?.failedFiles?.map((f) => ({
@@ -350,6 +369,11 @@ export function PhotoModal({
               createdPhotos.length;
             const failedCount =
               batchResult?.failedFiles?.length ?? 0;
+            // Separar duplicados (ya existían, no son un error) de fallos reales.
+            const duplicateCount = (batchResult?.failedFiles ?? []).filter(
+              (f) => /duplicad/i.test(f.reason ?? "")
+            ).length;
+            const realFailedCount = failedCount - duplicateCount;
 
             if (status === "partial") {
               uploadQueue.markPartial(taskId, {
@@ -381,11 +405,24 @@ export function PhotoModal({
               await assignTagsToPhotos(newPhotoIds, selectedTagNames);
             }
             toast({
-              title: status === "partial" ? "Subida parcial" : "Fotos subidas",
+              title:
+                realFailedCount > 0
+                  ? "Subida parcial"
+                  : duplicateCount > 0
+                  ? "Subida completada"
+                  : "Fotos subidas",
               description:
-                status === "partial"
-                  ? `Se crearon ${successCount} foto(s). ${failedCount} pendiente(s).`
-                  : `${uploadedFiles.length} foto(s) creada(s) correctamente.`,
+                [
+                  successCount > 0 ? `${successCount} foto(s) subida(s).` : null,
+                  duplicateCount > 0
+                    ? `${duplicateCount} ya estaban en el sistema (duplicadas, no se subieron de nuevo).`
+                    : null,
+                  realFailedCount > 0
+                    ? `${realFailedCount} fallaron (podés reintentar desde el modal).`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || `${uploadedFiles.length} foto(s) procesada(s).`,
             });
             onSave?.();
           },
