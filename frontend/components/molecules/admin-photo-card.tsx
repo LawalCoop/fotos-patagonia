@@ -34,7 +34,9 @@ function AdminPhotoCardComponent({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden rounded-2xl bg-muted transition-all hover:shadow-xl",
+        // p-0 y gap-0 anulan el padding por defecto del Card base (py-6), que
+        // dejaba asomar el fondo crema (bg-muted) arriba y abajo de la foto.
+        "group relative overflow-hidden rounded-2xl bg-muted p-0 gap-0 transition-all hover:shadow-xl",
         isSelected && "ring-2 ring-destructive/70"
       )}
     >

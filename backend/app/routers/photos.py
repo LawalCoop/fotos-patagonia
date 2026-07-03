@@ -17,6 +17,9 @@ router = APIRouter(
 class BulkPhotoCompletionRequest(BaseModel):
     photos: List[PhotoCompletionRequest]
     album_id: int | None = None
+    # Si viene, las fotos se agregan a esa sesión existente en vez de crear una
+    # nueva (finalización por tandas sin partir el lote en varias sesiones).
+    session_id: int | None = None
 
 class TagRequest(BaseModel):
     tag_names: List[str]
@@ -47,9 +50,10 @@ def complete_upload(
     photo_service = PhotoService(db)
     try:
         created_photos = photo_service.finalize_photo_uploads(
-            completion_requests=request.photos, 
+            completion_requests=request.photos,
             current_user=current_user,
-            album_id=request.album_id
+            album_id=request.album_id,
+            session_id=request.session_id
         )
         return created_photos
     except HTTPException as e:

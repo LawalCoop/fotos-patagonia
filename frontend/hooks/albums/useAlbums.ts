@@ -27,9 +27,10 @@ export function useAlbums(albumId?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAlbums = useCallback(async () => {
+  // opts.silent: no modifica `loading` (para refrescos periódicos en segundo plano).
+  const fetchAlbums = useCallback(async (opts?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.silent) setLoading(true);
 
       const url = albumId ? `/albums/${albumId}` : `/albums/`;
       const result = await apiFetch<BackendAlbum | BackendAlbum[]>(url);
@@ -40,7 +41,7 @@ export function useAlbums(albumId?: string) {
       setError(err.message);
       console.error("Error fetching albums:", err);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [albumId]);
 

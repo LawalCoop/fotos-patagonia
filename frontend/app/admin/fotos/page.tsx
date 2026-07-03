@@ -199,7 +199,9 @@ export default function FotosPage() {
     const ro = new ResizeObserver(() => update());
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+    // Depende de que existan fotos: el contenedor solo se monta con la lista no
+    // vacía; sin esta dep, gridWidth quedaría en 0 y columns en 1.
+  }, [filteredPhotos.length > 0]);
 
   const columns = useMemo(() => {
     const w = gridWidth || 0;
@@ -212,12 +214,25 @@ export default function FotosPage() {
     return Math.ceil(filteredPhotos.length / columns);
   }, [filteredPhotos.length, columns]);
 
+  // Estimación inicial de alto de fila. Tarjeta cuadrada (aspect-square):
+  // alto = ancho de tarjeta + gap vertical. La altura real la mide measureElement.
+  const estimatedRowHeight = useMemo(() => {
+    if (gridWidth > 0 && columns > 0) {
+      const cardWidth = (gridWidth - (columns - 1) * GRID_GAP_PX) / columns;
+      return Math.round(cardWidth + GRID_GAP_PX);
+    }
+    return ESTIMATED_ROW_HEIGHT;
+  }, [gridWidth, columns]);
+
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    // Solo estimación inicial: la altura real la mide measureElement (ref por fila),
+    // evitando acumular error de posicionamiento al hacer scroll.
+    estimateSize: () => estimatedRowHeight,
     overscan: 6,
   });
+
   const handleLoadMore = useCallback(async () => {
     if (!hasMore || loading || loadingMore) return;
   
@@ -253,6 +268,48 @@ export default function FotosPage() {
     newPhotos,
     oldPhotos,
   ]);
+
+  // Carga inicial: traer la primera página al montar. Sin esto la galería queda
+  // vacía tras un F5, porque el scroll infinito solo dispara cuando ya hay fotos
+  // renderizadas (y con la lista vacía nunca arranca).
+  useEffect(() => {
+    if (newPhotos.length === 0 && oldPhotos.length === 0 && hasMore) {
+      handleLoadMore();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Polling cada ~7s (solo con pestaña visible): trae la primera página y agrega
+  // las fotos con id no visto, para reflejar cargas hechas desde otra sesión.
+  const photosSnapshotRef = useRef({ newPhotos, oldPhotos });
+  const fetchPageRef = useRef(fetchPhotosPage);
+  useEffect(() => {
+    photosSnapshotRef.current = { newPhotos, oldPhotos };
+    fetchPageRef.current = fetchPhotosPage;
+  });
+  useEffect(() => {
+    const POLL_MS = 7000;
+    const timer = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      try {
+        const data = (await fetchPageRef.current({ offset: 0, limit: LIMIT })) ?? [];
+        if (!data.length) return;
+        const { newPhotos: np, oldPhotos: op } = photosSnapshotRef.current;
+        const known = new Set([...np.map((p) => p.id), ...op.map((p) => p.id)]);
+        const fresh = data.filter((p) => !known.has(p.id));
+        if (!fresh.length) return;
+        setNewPhotos((prev) => {
+          const prevIds = new Set(prev.map((p) => p.id));
+          const toAdd = fresh.filter((p) => !prevIds.has(p.id));
+          return toAdd.length ? [...toAdd, ...prev] : prev;
+        });
+      } catch {
+        /* refresco de fondo: ignorar errores transitorios */
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
   // Infinite scroll: cuando el último row visible está cerca del final, cargar más
   useEffect(() => {
     const virtualItems = rowVirtualizer.getVirtualItems();
@@ -475,6 +532,8 @@ export default function FotosPage() {
                   return (
                     <div
                       key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
                       className="grid gap-6"
                       style={{
                         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -483,6 +542,8 @@ export default function FotosPage() {
                         left: 0,
                         width: "100%",
                         transform: `translateY(${virtualRow.start}px)`,
+                        // Incluye el gap vertical dentro de la altura que mide measureElement.
+                        paddingBottom: GRID_GAP_PX,
                       }}
                     >
                       {rowItems.map((photo) => {

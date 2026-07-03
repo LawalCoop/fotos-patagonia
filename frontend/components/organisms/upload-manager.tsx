@@ -6,7 +6,6 @@ import { useUploadQueueStore } from "@/hooks/upload/useUploadQueue";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
 
 export function UploadManager() {
   const { jobs, remove } = useUploadQueueStore();
@@ -18,6 +17,18 @@ export function UploadManager() {
   );
   const visibleJobs = jobs.slice(-4); // limitar visualmente
 
+  // Título/estado del encabezado según cómo terminó todo.
+  const hasActive = activeJobs.length > 0;
+  const hasError = jobs.some((j) => j.status === "error");
+  const hasPartial = jobs.some((j) => j.status === "partial");
+  const headerTitle = hasActive
+    ? "Subidas en progreso"
+    : hasError
+    ? "Subidas finalizadas con errores"
+    : hasPartial
+    ? "Subidas finalizadas (parcial)"
+    : "Subida terminada";
+
   if (jobs.length === 0) return null;
 
   return (
@@ -25,8 +36,16 @@ export function UploadManager() {
       <Card className="shadow-lg border-gray-200 bg-white">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <Loader2 className={cn("h-4 w-4", activeJobs.length ? "animate-spin text-primary" : "text-muted-foreground")} />
-            <p className="text-sm font-semibold">Subidas en progreso</p>
+            {hasActive ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : hasError ? (
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            ) : hasPartial ? (
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            )}
+            <p className="text-sm font-semibold">{headerTitle}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setCollapsed((c) => !c)} aria-label="Colapsar" className="h-8 w-8">
@@ -60,7 +79,9 @@ export function UploadManager() {
                 {job.failedFiles && job.failedFiles.length > 0 && (
                   <div className="mt-2 space-y-1 rounded-md bg-amber-50 p-2">
                     <p className="text-xs font-semibold text-amber-700">
-                      {job.status === "partial"
+                      {job.failedFiles.every((f) => /duplicad/i.test(f.reason ?? ""))
+                        ? "Ya estaban en el sistema (no se subieron de nuevo):"
+                        : job.status === "partial"
                         ? "Subida parcial. Archivos pendientes:"
                         : "Archivos fallidos:"}
                     </p>
