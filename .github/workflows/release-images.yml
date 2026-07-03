@@ -1,5 +1,8 @@
 name: Build & push images (on tag)
 
+# Título de cada corrida (en vez del mensaje del commit): "Publicar imágenes v0.1.0"
+run-name: Publicar imágenes ${{ github.ref_name }}
+
 # Se dispara SOLO cuando se crea un tag (ej: v0.1.0).
 # Publica una imagen "oficial" del backend y del frontend en GHCR,
 # etiquetadas con la versión del tag + "latest".
