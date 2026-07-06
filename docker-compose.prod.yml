@@ -17,10 +17,8 @@ services:
       exec uvicorn main:app --host 0.0.0.0 --port 8000
       "
 
-    # 🔒 Backend SOLO accesible desde el droplet
-    ports:
-      - "127.0.0.1:8000:8000"
-
+    # Sin puertos publicados: el backend se alcanza solo por la red interna.
+    # Quien lo expone al mundo (vía /api) es Caddy.
     depends_on:
       db:
         condition: service_healthy
@@ -69,9 +67,25 @@ services:
       - NEXT_PUBLIC_API_URL=https://somosfotospatagonia.com/api
       - INTERNAL_API_URL=http://backend:8000
 
-    ports:
-      - "3000:3000"
+    # Sin puertos publicados: lo expone Caddy.
+    networks:
+      - fotopatagonia_network
 
+  # Caddy: única puerta al exterior (80/443). HTTPS automático + ruteo.
+  caddy:
+    image: caddy:2-alpine
+    container_name: fotopatagonia-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - fotopatagonia_network
 
@@ -81,3 +95,5 @@ networks:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,16 @@
+# Caddy: HTTPS automático + reverse proxy (la "puerta de entrada").
+# Caddy saca y renueva solo el certificado TLS (Let's Encrypt).
+# Si usan otro dominio, cambien esta línea.
+
+somosfotospatagonia.com {
+	# /api/* -> backend. handle_path le SACA el prefijo /api al reenviar,
+	# porque el backend expone rutas como /photos, /auth, /checkout (sin /api).
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Todo lo demás -> frontend (Next.js).
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
