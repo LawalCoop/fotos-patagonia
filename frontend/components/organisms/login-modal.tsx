@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/hooks/auth/useAuth"
-import { LogIn } from "lucide-react"
+import { LogIn, Eye, EyeOff } from "lucide-react"
 
 interface LoginModalProps {
   open: boolean
@@ -19,6 +19,7 @@ interface LoginModalProps {
 export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loginError, setLoginError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
@@ -67,15 +68,27 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
 
           <div className="space-y-2">
             <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="rounded-xl"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="rounded-xl pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                tabIndex={-1}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           {loginError && <p className="text-sm text-destructive">{loginError}</p>}

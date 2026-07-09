@@ -16,7 +16,7 @@ from models.cart import Cart, CartItem
 from models.saved_cart import SavedCart
 from models.order import Order, OrderItem
 
-from routers import auth, users, roles, photographers, sessions, albums, photos, cart, discounts, checkout, orders, saved_carts, storage, testing, tags, combos, earnings, admin
+from routers import auth, users, roles, photographers, sessions, albums, photos, cart, discounts, checkout, orders, saved_carts, storage, testing, tags, combos, earnings, admin, contact
 
 from core.config import settings
 
@@ -57,6 +57,7 @@ app.include_router(tags.router)
 app.include_router(combos.router)
 app.include_router(earnings.router)
 app.include_router(admin.router)
+app.include_router(contact.router)
 
 @app.get("/")
 def read_root():

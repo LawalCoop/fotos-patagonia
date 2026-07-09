@@ -54,6 +54,22 @@ class PhotoService(BaseService):
             )
         return f"photos/{base[len('thumb_'):]}"
 
+    def _build_thumb_object_name(self, object_name: str) -> str:
+        # photos/<uuid>.ext -> photos/thumb_<uuid>.ext (mismo criterio que el front)
+        last_slash = object_name.rfind("/")
+        directory = object_name[: last_slash + 1] if last_slash != -1 else ""
+        base = object_name[last_slash + 1 :]
+        return f"{directory}thumb_{base}"
+
+    def _delete_photo_files(self, object_name: str) -> None:
+        # Borra el original y su miniatura del storage. Cada uno por separado
+        # para que un fallo en uno no impida borrar el otro.
+        for name in (object_name, self._build_thumb_object_name(object_name)):
+            try:
+                storage_service.delete_file(name)
+            except Exception as e:
+                print(f"Error deleting {name} from storage: {e}")
+
     def ensure_object_belongs_to_photo(self, object_name: str) -> Photo:
         """
         Validates that the requested object belongs to a known photo.
@@ -208,11 +224,8 @@ class PhotoService(BaseService):
                     detail="You do not have permission to delete this photo."
                 )
         
-        try:
-            storage_service.delete_file(photo_to_delete.object_name)
-        except Exception as e:
-            print(f"Error deleting file from storage for photo ID {photo_id}: {e}")
-            
+        self._delete_photo_files(photo_to_delete.object_name)
+
         self.db.delete(photo_to_delete)
         self.db.commit()
 
@@ -254,10 +267,7 @@ class PhotoService(BaseService):
 
         db_ids_to_delete = []
         for photo in valid_photos_to_delete:
-            try:
-                storage_service.delete_file(photo.object_name)
-            except Exception as e:
-                print(f"Error deleting file for photo ID {photo.id} from storage: {e}")
+            self._delete_photo_files(photo.object_name)
             db_ids_to_delete.append(photo.id)
             
         self.db.query(Photo).filter(Photo.id.in_(db_ids_to_delete)).delete(synchronize_session=False)

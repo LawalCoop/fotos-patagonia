@@ -82,14 +82,14 @@ export default function ContactoPage() {
   
     try {
       setIsSubmitting(true)
-      //console.log("🟡 ejecutando recaptcha...")
-
-      const token = await recaptchaRef.current?.executeAsync()
-      //console.log("🟢 token recaptcha:", token)
-
-      if (!token) {
-        toast.error("Captcha inválido")
-        return
+      // reCAPTCHA solo si está configurado el site key (si no, el form igual funciona)
+      let token: string | null | undefined = undefined
+      if (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+        token = await recaptchaRef.current?.executeAsync()
+        if (!token) {
+          toast.error("Captcha inválido")
+          return
+        }
       }
       //console.log("🟡 enviando POST /api/contact")
 
@@ -346,11 +346,13 @@ export default function ContactoPage() {
                     className="min-h-[120px] rounded-xl border-gray-200"
                   />
                 </div>
-                <ReCAPTCHA
-                  ref={recaptchaRef}
-                  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-                  size="invisible"
-                />
+                {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && (
+                  <ReCAPTCHA
+                    ref={recaptchaRef}
+                    sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                    size="invisible"
+                  />
+                )}
 
                 <Button
                   type="submit"

@@ -40,6 +40,8 @@ class Settings(BaseSettings):
 
     EMAIL_FROM: str = "Fotos Patagonia <hola@somosfotospatagonia.com>"
     RESEND_API_KEY: str = ""
+    # Casilla que recibe los mensajes del formulario de contacto.
+    CONTACT_EMAIL: str = "somos.fotos.patagonia@gmail.com"
 
     @property
     def storage_allowed_origins(self) -> list[str]:

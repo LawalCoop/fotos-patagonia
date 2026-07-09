@@ -52,6 +52,11 @@ export default function AlbumDetailPage() {
     return () => clearInterval(timer)
   }, [])
 
+  // Cache de fotos por id: conserva la MISMA referencia de objeto entre refrescos
+  // mientras la foto no cambie. Así la foto abierta no parpadea y el navegador
+  // mantiene la posición del scroll cuando llegan fotos nuevas (no re-crea el DOM).
+  const photoIdentityCache = useRef<Map<string | number, { sig: string; photo: Photo }>>(new Map())
+
   // Transform backend data
   const album = albumData && !Array.isArray(albumData) ? albumData : null
   // Debug: registrar el orden crudo de sesiones recibido
@@ -111,12 +116,20 @@ export default function AlbumDetailPage() {
             })
           }
 
-          photos.push(
-            mapBackendPhotoToPhoto(backendPhoto, {
-              session: backendPhoto.session,
-              albumName: album.name,
-            }),
-          )
+          const mappedPhoto = mapBackendPhotoToPhoto(backendPhoto, {
+            session: backendPhoto.session,
+            albumName: album.name,
+          })
+          // Reusar el objeto anterior si la foto no cambió (misma identidad):
+          // evita parpadeo de la foto abierta y salto de scroll al refrescar.
+          const sig = `${mappedPhoto.object_name}|${mappedPhoto.price}|${mappedPhoto.tags?.length ?? 0}`
+          const cached = photoIdentityCache.current.get(mappedPhoto.id)
+          if (cached && cached.sig === sig) {
+            photos.push(cached.photo)
+          } else {
+            photoIdentityCache.current.set(mappedPhoto.id, { sig, photo: mappedPhoto })
+            photos.push(mappedPhoto)
+          }
         })
       }
     })
