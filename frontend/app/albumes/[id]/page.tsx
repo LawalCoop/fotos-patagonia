@@ -122,7 +122,7 @@ export default function AlbumDetailPage() {
           })
           // Reusar el objeto anterior si la foto no cambió (misma identidad):
           // evita parpadeo de la foto abierta y salto de scroll al refrescar.
-          const sig = `${mappedPhoto.object_name}|${mappedPhoto.price}|${mappedPhoto.tags?.length ?? 0}`
+          const sig = `${mappedPhoto.objectName}|${mappedPhoto.price}|${mappedPhoto.tags?.length ?? 0}`
           const cached = photoIdentityCache.current.get(mappedPhoto.id)
           if (cached && cached.sig === sig) {
             photos.push(cached.photo)
