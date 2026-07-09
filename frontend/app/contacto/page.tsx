@@ -93,7 +93,9 @@ export default function ContactoPage() {
       }
       //console.log("🟡 enviando POST /api/contact")
 
-      const res = await fetch("/api/contact", {
+      // Barra final: el backend expone /contact/ y, detrás del proxy, la falta
+      // de barra provoca un 307 a http:// que el navegador bloquea (mixed content).
+      const res = await fetch("/api/contact/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
