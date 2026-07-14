@@ -43,6 +43,10 @@ node_modules
 /frontend/.next/
 /frontend/out/
 *.tsbuildinfo
+# Artefactos de tests e2e (Playwright)
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/playwright/.cache/
 
 # Archivos de entorno locales del frontend
 /frontend/.env.local

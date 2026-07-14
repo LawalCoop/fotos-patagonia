@@ -57,10 +57,8 @@ export default function WatermarkedImage({
       className={cn("relative w-full h-full select-none", className)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* 1. Capa de protección: NO captura eventos (pointer-events-none) para no
-          bloquear el scroll táctil ni tapar los botones (carrito, favorito, seleccionar)
-          que van por encima. El menú contextual se bloquea en el contenedor y el
-          arrastre en la propia imagen (draggable={false}). */}
+      {/* Capa de protección sin captura de eventos. Menú contextual bloqueado en
+          el contenedor; arrastre, con draggable={false} en la imagen. */}
       <div
         className="pointer-events-none absolute inset-0 z-20 select-none"
         aria-hidden

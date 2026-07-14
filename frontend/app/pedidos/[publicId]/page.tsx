@@ -47,7 +47,9 @@ const splitOrderItems = (items: OrderItem[]) => {
 
 const triggerFileDownload = async (url: string, filename: string) => {
   try {
-    const response = await fetch(url, { credentials: "omit" });
+    // cache: "no-store" evita reusar la respuesta cacheada por el <img> (que se
+    // guarda sin cabecera CORS); sin esto el fetch a R2 falla por CORS y no baja.
+    const response = await fetch(url, { mode: "cors", cache: "no-store", credentials: "omit" });
     if (!response.ok) throw new Error("Error al descargar archivo");
 
     const blob = await response.blob();
@@ -81,7 +83,7 @@ function PhotoGridItem({ photo }: { photo: OrderItemPhoto }) {
         className="transition-transform group-hover:scale-105"
         showWatermark={false} // El usuario ya compró la foto, no queremos marca de agua
       />
-      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
         <Button
           size="sm"
           onClick={() => triggerFileDownload(imageUrl, buildPhotoFilename(photo))}

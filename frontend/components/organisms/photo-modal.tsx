@@ -28,8 +28,16 @@ import { useTags } from "@/hooks/tags/useTags";
 import { apiFetch } from "@/lib/api";
 import type { BackendPhoto } from "@/hooks/photos/usePhotos";
 import type { UploadingPhoto } from "@/lib/types";
-import { generateThumbnailDataUrl } from "@/lib/photo-thumbnails";
 import { useUploadQueueStore } from "@/hooks/upload/useUploadQueue";
+import {
+  createFilePreviews,
+  visiblePreviews,
+  hiddenPreviewCount,
+  revokePreview,
+} from "@/lib/upload-previews";
+
+// Máximo de miniaturas renderizadas en el modal. No limita la subida.
+const PREVIEW_LIMIT = 48;
 
 interface PhotoModalProps {
   open: boolean;
@@ -162,17 +170,11 @@ export function PhotoModal({
     setIsDragging(false);
   }, []);
 
-  const handleFiles = useCallback(async (files: File[]) => {
+  const handleFiles = useCallback((files: File[]) => {
     if (!files.length) return;
     setUploadedFiles((prev) => [...prev, ...files]);
 
-    const previews = await Promise.all(
-      files.map((file) => generateThumbnailDataUrl(file).catch(() => ""))
-    );
-    setPreviewUrls((prev) => [
-      ...prev,
-      ...previews.filter((url) => Boolean(url)),
-    ]);
+    setPreviewUrls((prev) => [...prev, ...createFilePreviews(files)]);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -199,7 +201,10 @@ export function PhotoModal({
 
   const removeFile = (index: number) => {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+    setPreviewUrls((prev) => {
+      revokePreview(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const toggleTagSelection = (tagId: string) => {
@@ -751,26 +756,39 @@ export function PhotoModal({
             </Button>
           </div>
               {previewUrls.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {previewUrls.map((url, index) => (
-                    <div
-                      key={index}
-                      className="group relative aspect-square overflow-hidden rounded-xl"
-                    >
-                      <img
-                        src={url || "/placeholder.svg"}
-                        alt={`Preview ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="absolute right-1 top-1 rounded-full bg-destructive p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {uploadedFiles.length} foto{uploadedFiles.length !== 1 ? "s" : ""} seleccionada
+                    {uploadedFiles.length !== 1 ? "s" : ""} — se subirán todas.
+                  </p>
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                    {visiblePreviews(previewUrls, PREVIEW_LIMIT).map((url, index) => (
+                      <div
+                        key={index}
+                        className="group relative aspect-square overflow-hidden rounded-xl"
                       >
-                        <X className="h-4 w-4 text-white" />
-                      </button>
-                    </div>
-                  ))}
+                        <img
+                          src={url || "/placeholder.svg"}
+                          alt={`Preview ${index + 1}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="absolute right-1 top-1 rounded-full bg-destructive p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                        >
+                          <X className="h-4 w-4 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {hiddenPreviewCount(previewUrls, PREVIEW_LIMIT) > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      + {hiddenPreviewCount(previewUrls, PREVIEW_LIMIT)} foto
+                      {hiddenPreviewCount(previewUrls, PREVIEW_LIMIT) !== 1 ? "s" : ""} más (no se muestran acá, pero se suben igual)
+                    </p>
+                  )}
                 </div>
               )}
             </div>

@@ -39,8 +39,10 @@ export function PhotoViewerItemActions({ photo }: PhotoViewerItemActionsProps) {
       {/* 🛒 AGREGAR AL CARRITO */}
       <button
         onClick={() => {
+          // Sin item: agregar. Con item: alternar y limpiar si queda sin intención.
+          // (Llamar removeFromCartIfUnselected siempre anulaba el alta.)
           toggleSelected(photo.id)
-          removeFromCartIfUnselected(photo.id)
+          if (isInCart) removeFromCartIfUnselected(photo.id)
         }}
         className={cn(
           "photo-viewer-item-btn",

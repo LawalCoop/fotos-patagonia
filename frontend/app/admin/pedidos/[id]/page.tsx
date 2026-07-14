@@ -39,7 +39,9 @@ const buildZipFilename = (photo: Photo, index: number) => {
 
 const triggerFileDownload = async (url: string, filename: string) => {
   try {
-    const response = await fetch(url, { credentials: "omit" });
+    // cache: "no-store" evita reusar la respuesta cacheada por el <img> (sin CORS),
+    // que hace fallar el fetch a R2 y deja la descarga sin funcionar.
+    const response = await fetch(url, { mode: "cors", cache: "no-store", credentials: "omit" });
     if (!response.ok) throw new Error("Error al descargar archivo");
 
     const blob = await response.blob();
@@ -321,7 +323,7 @@ export default function OrderDetailPage() {
         const photo = mapBackendPhotoToPhoto(item.photo as BackendPhoto);
   
         const presignedUrl = await fetchPresignedUrl(photo);
-        const res = await fetch(presignedUrl, { credentials: "omit" });
+        const res = await fetch(presignedUrl, { mode: "cors", cache: "no-store", credentials: "omit" });
         if (!res.ok) throw new Error("Error descargando foto");
   
         const buffer = await res.arrayBuffer();
