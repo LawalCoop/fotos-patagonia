@@ -1,5 +1,14 @@
 version: "3.8"
 
+# Rotación de logs común a todos los servicios: json-file, hasta 5 archivos de
+# 10MB por contenedor. Evita que los logs llenen el disco y conserva historial
+# reciente para el panel (Dozzle).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   backend:
     # Baja la imagen ya construida del registry (no compila acá).
@@ -9,6 +18,7 @@ services:
     env_file:
       - ./backend/.env
     restart: unless-stopped
+    logging: *default-logging
 
     # Migrations + app (fail fast)
     command: >
@@ -31,8 +41,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    
-    
+
+
   db:
     image: postgres:13
     container_name: fotopatagonia-db
@@ -40,6 +50,7 @@ services:
       - ./backend/.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    logging: *default-logging
 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -56,7 +67,8 @@ services:
     image: ghcr.io/lawalcoop/fotopatagonia-frontend:${TAG:-latest}
     container_name: fotopatagonia-frontend
     restart: unless-stopped
-    
+    logging: *default-logging
+
     env_file:
       - ./frontend/.env
 
@@ -76,6 +88,7 @@ services:
     image: caddy:2-alpine
     container_name: fotopatagonia-caddy
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - backend
       - frontend
@@ -86,6 +99,22 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - fotopatagonia_network
+
+  # Panel web de logs (solo lectura de la salida de los contenedores).
+  # No publica puertos: se accede vía Caddy en /panel-logs con usuario/contraseña.
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: fotopatagonia-dozzle
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - DOZZLE_BASE=/panel-logs
+      - DOZZLE_NO_ANALYTICS=true
+    volumes:
+      # Solo lectura del socket de Docker para leer los logs de los contenedores.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - fotopatagonia_network
 

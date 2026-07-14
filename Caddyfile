@@ -9,6 +9,15 @@ somosfotospatagonia.com {
 		reverse_proxy backend:8000
 	}
 
+	# Panel de logs (Dozzle), protegido con usuario/contraseña.
+	# Reemplazá el hash de abajo por el que genera `caddy hash-password`.
+	handle /panel-logs* {
+		basic_auth {
+			admin REEMPLAZAR_POR_HASH_BCRYPT
+		}
+		reverse_proxy dozzle:8080
+	}
+
 	# Todo lo demás -> frontend (Next.js).
 	handle {
 		reverse_proxy frontend:3000
