@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
+from models.photo import Photo
 from fastapi import HTTPException, status
 from services.storage import storage_service
 import logging
@@ -46,21 +47,29 @@ class AlbumService(BaseService):
         
         return album
 
+    def _album_load_options(self):
+        # Carga anticipada de todo lo que la respuesta serializa por foto
+        # (fotógrafo y tags). Sin esto SQLAlchemy hace una consulta por foto
+        # (N+1): un álbum de 400 fotos disparaba ~800 consultas por request,
+        # cada una reteniendo la conexión. selectinload evita multiplicar filas
+        # en las relaciones a-muchos; joinedload sirve para el fotógrafo (a-uno).
+        photos = selectinload(Album.sessions).selectinload(PhotoSession.photos)
+        return [
+            photos.joinedload(Photo.photographer),
+            photos.selectinload(Photo.tags),
+        ]
+
     def list_albums(self) -> list[Album]:
         """Returns a list of all albums with populated photo URLs."""
-        albums = self.db.query(Album).options(
-            joinedload(Album.sessions).joinedload(PhotoSession.photos)
-        ).all()
-        
+        albums = self.db.query(Album).options(*self._album_load_options()).all()
+
         return [self._populate_photo_urls(album) for album in albums]
 
     def get_album(self, album_id: int) -> Album:
         """Returns a specific album by its ID with populated photo URLs."""
         album = (
             self.db.query(Album)
-            .options(
-                joinedload(Album.sessions).joinedload(PhotoSession.photos)
-            )
+            .options(*self._album_load_options())
             .filter(Album.id == album_id)
             .first()
         )

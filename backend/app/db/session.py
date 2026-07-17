@@ -2,10 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
 
-# El default de SQLAlchemy (pool_size=5, max_overflow=10) satura con galerías
-# grandes: el front pide una URL firmada por foto y cada request toma una
-# conexión. Los endpoints son sync, así que FastAPI los corre en su threadpool
-# de 40; con 40 conexiones disponibles la cola nunca espera.
+# 40 = tamaño del threadpool que FastAPI usa para endpoints sync, o sea el
+# máximo de requests concurrentes: con una conexión por hilo la cola no espera.
+# El default (5+10) dejaba 25 hilos peleando por 15 conexiones.
 engine = create_engine(
     settings.DATABASE_URL,
     pool_size=10,
