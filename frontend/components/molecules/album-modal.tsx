@@ -149,16 +149,6 @@ export function AlbumModal({ isOpen, mode, album, onClose, onSave }: AlbumModalP
               type="number"
               value={defaultPhotoPrice}
               onChange={(e) => setDefaultPhotoPrice(e.target.value)}
-              onKeyDown={(e) => {
-                // Evita que cambie con flechas (ArrowUp/ArrowDown)
-                if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                  e.preventDefault()
-                }
-              }}
-              onWheel={(e) => {
-                // Evita que cambie con scroll del mouse
-                e.currentTarget.blur()
-              }}
               placeholder="Ej: 15000"
               className="mt-1 rounded-lg border-gray-200"
             />

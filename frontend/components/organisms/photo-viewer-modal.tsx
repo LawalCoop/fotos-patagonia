@@ -38,6 +38,7 @@ export function PhotoViewerModal({ photo,  nextPhoto, onClose, onNext, onPrev }:
     originalUrl,
     previewLoading,
     originalLoading,
+    originalError,
     error: imageError,
   } = usePhotoViewerImage(photo)
 
@@ -336,7 +337,7 @@ export function PhotoViewerModal({ photo,  nextPhoto, onClose, onNext, onPrev }:
     {/* Cerrar */}
     <button
       onClick={() => setIsFullscreen(false)}
-      className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+      className="absolute right-6 top-6 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
       aria-label="Cerrar pantalla completa"
     >
       <X className="h-6 w-6" />
@@ -346,7 +347,9 @@ export function PhotoViewerModal({ photo,  nextPhoto, onClose, onNext, onPrev }:
     <button
       onClick={handleToggleFavorite}
       className={cn(
-        "absolute left-6 top-6 rounded-full p-2 transition-colors",
+        // z-10: el contenedor de la imagen ocupa toda la pantalla y va después
+        // en el DOM, así que sin z-index se dibuja encima y bloquea el clic.
+        "absolute left-6 top-6 z-10 rounded-full p-2 transition-colors",
         isFavorite
           ? "bg-primary text-foreground"
           : "bg-white/10 text-white hover:bg-white/20"
@@ -375,8 +378,25 @@ export function PhotoViewerModal({ photo,  nextPhoto, onClose, onNext, onPrev }:
       </div>
     )}
 
-    {!originalUrl && (
+    {!originalUrl && originalLoading && (
       <div className="text-white">Cargando alta resolución…</div>
+    )}
+
+    {!originalUrl && !originalLoading && (
+      <div className="flex flex-col items-center gap-3 px-6 text-center text-white">
+        <p>No se pudo cargar la alta resolución.</p>
+        <p className="text-sm text-white/70">
+          {originalError
+            ? "Revisá la conexión y probá de nuevo."
+            : "La foto todavía no está disponible."}
+        </p>
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="rounded-full bg-white/10 px-4 py-2 text-sm hover:bg-white/20"
+        >
+          Volver
+        </button>
+      </div>
     )}
   </div>
 )}

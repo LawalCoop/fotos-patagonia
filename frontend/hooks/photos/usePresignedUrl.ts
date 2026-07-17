@@ -42,15 +42,21 @@ export function usePresignedUrl(objectName?: string | null, options?: { enabled?
     setLoading(true)
 
     // ✅ 2. deduplicación de requests
+    // El finally corre también si el pedido falla: si no, la promesa rechazada
+    // queda en pendingCache y todo montaje posterior la reusa sin reintentar,
+    // dejando la foto rota hasta recargar la página.
     const request =
       pendingCache.get(objectName) ??
       apiFetch<PresignedUrlResponse>(
         `/photos/presigned-url/?object_name=${encodeURIComponent(objectName)}`
-      ).then((res) => {
-        urlCache.set(objectName, res.url)
-        pendingCache.delete(objectName)
-        return res.url
-      })
+      )
+        .then((res) => {
+          urlCache.set(objectName, res.url)
+          return res.url
+        })
+        .finally(() => {
+          pendingCache.delete(objectName)
+        })
 
     pendingCache.set(objectName, request)
 

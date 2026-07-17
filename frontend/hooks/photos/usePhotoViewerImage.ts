@@ -50,6 +50,7 @@ export function usePhotoViewerImage(photo: Photo | null) {
     originalUrl: originalReady ? originalUrl : undefined,
     previewLoading,
     originalLoading,
+    originalError,
     error,
   }
 }
