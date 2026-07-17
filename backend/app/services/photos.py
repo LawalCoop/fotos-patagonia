@@ -6,7 +6,7 @@ from models.tag import Tag
 from services.base import BaseService
 from services.storage import storage_service
 from pydantic import BaseModel
-from typing import List
+from typing import Dict, List
 from sqlalchemy import select
 from models.user import User
 from core.permissions import Permissions
@@ -109,6 +109,40 @@ class PhotoService(BaseService):
         """
         self.ensure_object_belongs_to_photo(object_name)
         return storage_service.generate_presigned_get_url(object_name)
+
+    def generate_presigned_view_urls(self, object_names: List[str]) -> Dict[str, str]:
+        """
+        Batch version of generate_presigned_view_url: resolves ownership for the
+        whole list with a single query instead of one per object.
+
+        Unknown or malformed names are omitted from the result rather than
+        raising, so one bad entry cannot fail an entire gallery.
+        """
+        originals: Dict[str, str] = {}
+        for object_name in dict.fromkeys(object_names):
+            if not self._is_thumbnail_object(object_name):
+                originals[object_name] = object_name
+                continue
+            try:
+                originals[object_name] = self._resolve_original_from_thumb(object_name)
+            except HTTPException:
+                continue
+
+        if not originals:
+            return {}
+
+        known_originals = {
+            row[0]
+            for row in self.db.query(Photo.object_name)
+            .filter(Photo.object_name.in_(set(originals.values())))
+            .all()
+        }
+
+        return {
+            object_name: storage_service.generate_presigned_get_url(object_name)
+            for object_name, original in originals.items()
+            if original in known_originals
+        }
 
     def list_photos(self, offset: int = 0, limit: int = 10, photographer_id: int | None = None) -> List[PhotoSchema]:
         """Returns a list of all photos with presigned URLs."""

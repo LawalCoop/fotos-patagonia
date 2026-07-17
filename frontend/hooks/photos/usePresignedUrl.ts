@@ -1,15 +1,32 @@
 import { useState, useEffect } from "react"
 import { apiFetch } from "@/lib/api"
+import { createPresignedUrlBatcher } from "@/lib/presigned-url-batch"
 
-interface PresignedUrlResponse {
-  url: string
+interface PresignedUrlsResponse {
+  urls: Record<string, string>
 }
 
 const PLACEHOLDER_URL = "/placeholder.svg"
 
+// Debe coincidir con MAX_PRESIGNED_BATCH del backend.
+const PRESIGNED_BATCH_LIMIT = 500
+
 // ✅ caches globales
 const urlCache = new Map<string, string>()
 const pendingCache = new Map<string, Promise<string>>()
+
+// Todas las miniaturas de una galería montan a la vez: el batcher las junta en
+// un request en vez de uno por foto.
+const requestPresignedUrl = createPresignedUrlBatcher(
+  async (objectNames) => {
+    const response = await apiFetch<PresignedUrlsResponse>("/photos/presigned-urls/", {
+      method: "POST",
+      body: JSON.stringify({ object_names: objectNames }),
+    })
+    return response.urls
+  },
+  { maxBatch: PRESIGNED_BATCH_LIMIT },
+)
 
 export function usePresignedUrl(objectName?: string | null, options?: { enabled?: boolean }) {
   const { enabled = true } = options ?? {}
@@ -47,12 +64,10 @@ export function usePresignedUrl(objectName?: string | null, options?: { enabled?
     // dejando la foto rota hasta recargar la página.
     const request =
       pendingCache.get(objectName) ??
-      apiFetch<PresignedUrlResponse>(
-        `/photos/presigned-url/?object_name=${encodeURIComponent(objectName)}`
-      )
-        .then((res) => {
-          urlCache.set(objectName, res.url)
-          return res.url
+      requestPresignedUrl(objectName)
+        .then((url) => {
+          urlCache.set(objectName, url)
+          return url
         })
         .finally(() => {
           pendingCache.delete(objectName)

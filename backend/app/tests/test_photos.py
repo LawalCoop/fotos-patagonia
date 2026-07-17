@@ -136,3 +136,120 @@ def test_complete_upload_multiple_photos(photographer_client: TestClient, monkey
     assert created_photos[1]["filename"] == "photo2.png"
     assert created_photos[0]["url"] == mock_urls[0]
     assert created_photos[1]["url"] == mock_urls[1]
+
+# --- Presigned URLs en lote ---
+
+@pytest.fixture(scope="function")
+def photos_for_batch(db_session: Session, session_for_photo: PhotoSession):
+    """Crea 3 fotos con object_name conocido."""
+    from models.photo import Photo
+
+    photos = [
+        Photo(
+            object_name=f"photos/batch-{i}.jpg",
+            filename=f"batch-{i}.jpg",
+            price=10.0,
+            photographer_id=session_for_photo.photographer_id,
+            session_id=session_for_photo.id,
+        )
+        for i in range(3)
+    ]
+    db_session.add_all(photos)
+    db_session.flush()
+    return photos
+
+
+def _mock_presign(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.photos.storage_service.generate_presigned_get_url",
+        lambda object_name: f"https://r2.test/{object_name}?signed",
+    )
+
+
+def test_presigned_urls_batch_returns_originals_and_thumbs(
+    client: TestClient, monkeypatch, photos_for_batch
+):
+    """Originales y miniaturas derivadas de una foto conocida se firman."""
+    _mock_presign(monkeypatch)
+
+    response = client.post(
+        "/photos/presigned-urls/",
+        json={"object_names": ["photos/batch-0.jpg", "photos/thumb_batch-1.jpg"]},
+    )
+
+    assert response.status_code == 200, response.text
+    urls = response.json()["urls"]
+    assert urls == {
+        "photos/batch-0.jpg": "https://r2.test/photos/batch-0.jpg?signed",
+        "photos/thumb_batch-1.jpg": "https://r2.test/photos/thumb_batch-1.jpg?signed",
+    }
+
+
+def test_presigned_urls_batch_omits_unknown_without_failing(
+    client: TestClient, monkeypatch, photos_for_batch
+):
+    """Un nombre desconocido se omite y no tumba el resto del lote."""
+    _mock_presign(monkeypatch)
+
+    response = client.post(
+        "/photos/presigned-urls/",
+        json={
+            "object_names": [
+                "photos/batch-0.jpg",
+                "photos/no-existe.jpg",
+                "photos/thumb_tampoco.jpg",
+                "nombre-invalido",
+            ]
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    urls = response.json()["urls"]
+    assert list(urls) == ["photos/batch-0.jpg"]
+
+
+def test_presigned_urls_batch_runs_a_single_query(
+    client: TestClient, monkeypatch, db_session: Session, photos_for_batch
+):
+    """
+    El motivo del endpoint: una sola query por lote, sin importar el tamaño.
+    Una regresión a N queries reproduce el agotamiento del pool en producción.
+    """
+    from sqlalchemy import event
+
+    _mock_presign(monkeypatch)
+
+    selects = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selects.append(statement)
+
+    event.listen(db_session.bind, "before_cursor_execute", record)
+    try:
+        response = client.post(
+            "/photos/presigned-urls/",
+            json={"object_names": [f"photos/batch-{i}.jpg" for i in range(3)]},
+        )
+    finally:
+        event.remove(db_session.bind, "before_cursor_execute", record)
+
+    assert response.status_code == 200, response.text
+    assert len(response.json()["urls"]) == 3
+    assert len(selects) == 1, f"Se esperaba 1 SELECT, hubo {len(selects)}"
+
+
+def test_presigned_urls_batch_rejects_oversized_request(client: TestClient):
+    """El tope acota el costo de un request abusivo."""
+    response = client.post(
+        "/photos/presigned-urls/",
+        json={"object_names": [f"photos/{i}.jpg" for i in range(501)]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_presigned_urls_batch_rejects_empty_request(client: TestClient):
+    response = client.post("/photos/presigned-urls/", json={"object_names": []})
+
+    assert response.status_code == 422

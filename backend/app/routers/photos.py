@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import Dict, List
 from deps import get_db, PermissionChecker
 from services.photos import PhotoService, PhotoCompletionRequest
 from models.photo import PhotoSchema, PhotoUpdateSchema
 from services.storage import storage_service
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from models.user import User
 from core.permissions import Permissions
 
@@ -27,6 +27,14 @@ class TagRequest(BaseModel):
 class PresignedUrlResponse(BaseModel):
     url: str
 
+MAX_PRESIGNED_BATCH = 500
+
+class PresignedUrlsRequest(BaseModel):
+    object_names: List[str] = Field(..., min_length=1, max_length=MAX_PRESIGNED_BATCH)
+
+class PresignedUrlsResponse(BaseModel):
+    urls: Dict[str, str]
+
 @router.get("/presigned-url/", response_model=PresignedUrlResponse)
 def get_presigned_url(object_name: str, db: Session = Depends(get_db)):
     """
@@ -36,6 +44,17 @@ def get_presigned_url(object_name: str, db: Session = Depends(get_db)):
     photo_service = PhotoService(db)
     url = photo_service.generate_presigned_view_url(object_name)
     return {"url": url}
+
+@router.post("/presigned-urls/", response_model=PresignedUrlsResponse)
+def get_presigned_urls(request: PresignedUrlsRequest, db: Session = Depends(get_db)):
+    """
+    Batch version of /presigned-url/: one request and one query for a whole
+    gallery instead of one per photo. Names without a known photo are omitted,
+    so the caller must treat a missing key as "not available".
+    """
+    photo_service = PhotoService(db)
+    urls = photo_service.generate_presigned_view_urls(request.object_names)
+    return {"urls": urls}
 
 @router.post("/complete-upload", response_model=List[PhotoSchema], status_code=status.HTTP_201_CREATED)
 def complete_upload(
