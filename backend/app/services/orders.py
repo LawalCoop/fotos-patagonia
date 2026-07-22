@@ -1,6 +1,7 @@
 import zipfile
 import io
 import logging
+import uuid
 from fastapi.responses import StreamingResponse
 from services.storage import storage_service
 from sqlalchemy.orm import Session, joinedload
@@ -215,6 +216,12 @@ class OrderService(BaseService):
         return order
 
     def get_order_by_public_id(self, public_id: str) -> Order:
+        # Coerce a UUID: evita el 500 por un id mal formado y normaliza el tipo
+        # para el filtro (Postgres acepta el str; otros backends esperan UUID).
+        try:
+            public_id = uuid.UUID(str(public_id))
+        except (ValueError, TypeError, AttributeError):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
         order = self.db.query(Order).options(
             joinedload(Order.user),
             joinedload(Order.items).options(
@@ -420,7 +427,10 @@ class OrderService(BaseService):
                             )
                             image_bytes = obj['Body'].read()
                             
-                            base_name = (photo.place or photo.description or f"foto-{photo.id}").strip()
+                            # photo.place no existe en el modelo: leerlo lanzaba
+                            # AttributeError y cada foto se descartaba, dejando el
+                            # zip vacío. Se nombra igual que la descarga individual.
+                            base_name = (photo.description or f"foto-{photo.id}").strip()
                             safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in base_name)[:100]
                             filename = f"{safe_name}_{photo.id}.jpg"
                             

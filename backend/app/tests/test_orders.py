@@ -256,3 +256,65 @@ def test_mark_order_as_paid_requires_payment_method(supervisor_client: TestClien
         assert any("payment_method" in str(err).lower() for err in detail)
     else:
         assert "payment method" in detail.lower()
+
+# --- ZIP de descarga (regresion del bug de 'place') ---
+
+def test_download_zip_contains_photos(client, db_session, user_factory, test_photographer, monkeypatch):
+    """
+    El zip debe contener las fotos del pedido. Antes, generate_order_zip leia
+    photo.place (inexistente) y descartaba cada foto: el zip salia vacio.
+    """
+    import io
+    import zipfile
+    from models.album import Album
+    from models.photo_session import PhotoSession
+    from models.photo import Photo
+    from models.order import Order, OrderItem, PaymentMethod, PaymentStatus, OrderStatus
+
+    # S3 falso: devuelve bytes de imagen sin salir a la red.
+    fake_body = type("Body", (), {"read": lambda self: b"IMG-BYTES"})()
+    monkeypatch.setattr(
+        "app.services.orders.storage_service.s3_client.get_object",
+        lambda **kwargs: {"Body": fake_body},
+    )
+
+    album = Album(name="Zip Album", description="d")
+    db_session.add(album)
+    db_session.flush()
+    session = PhotoSession(
+        event_name="Zip Session", event_date=datetime.now(timezone.utc),
+        location="loc", photographer_id=test_photographer.id, album_id=album.id,
+    )
+    db_session.add(session)
+    db_session.flush()
+
+    photos = [
+        Photo(
+            filename=f"z{i}.jpg", description=f"foto {i}", price=10.0,
+            object_name=f"photos/zip-{i}.jpg",
+            photographer_id=test_photographer.id, session_id=session.id,
+        )
+        for i in range(3)
+    ]
+    db_session.add_all(photos)
+    db_session.flush()
+
+    customer = user_factory("Customer", "customer.zip@test.com")
+    order = Order(
+        user_id=customer.id, total=30.0, payment_method=PaymentMethod.MP,
+        payment_status=PaymentStatus.PAID, order_status=OrderStatus.PAID,
+    )
+    db_session.add(order)
+    db_session.flush()
+    for p in photos:
+        db_session.add(OrderItem(order_id=order.id, photo_id=p.id, quantity=1, price=p.price))
+    db_session.flush()
+    db_session.refresh(order)
+
+    response = client.get(f"/orders/public/{order.public_id}/download-zip")
+
+    assert response.status_code == 200, response.text
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        names = zf.namelist()
+    # El bug dejaba names == []; ahora deben estar las 3 fotos.
+    assert len(names) == 3, f"El zip deberia tener 3 fotos, tiene {len(names)}: {names}"
