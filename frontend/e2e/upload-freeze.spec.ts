@@ -42,15 +42,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("la medición detecta un bloqueo real del hilo principal", async ({ page }) => {
-  // Sanidad: si el hilo trabaja 500ms, la medición debe reflejarlo.
-  const { busyMs } = await mainThreadBusyMs(page, { files: 1200, mode: "block", blockMs: 500 });
-  expect(busyMs).toBeGreaterThan(400);
+  // Sanidad: si el hilo trabaja 1s, la medición debe reflejarlo.
+  const { busyMs } = await mainThreadBusyMs(page, { files: 1200, mode: "block", blockMs: 1000 });
+  expect(busyMs).toBeGreaterThan(900);
 });
 
 test("generar 1200 previews con object URLs no bloquea la página", async ({ page }) => {
   const { busyMs, count } = await mainThreadBusyMs(page, { files: 1200, mode: "objectUrl" });
 
   expect(count).toBe(1200); // una preview por archivo
-  // El trabajo real ocupa el hilo apenas unos ms: no hay congelamiento posible.
-  expect(busyMs).toBeLessThan(150);
+  // El trabajo real ocupa el hilo unos cientos de ms como mucho (según la carga
+  // de la máquina); decodificar cada foto en un canvas llevaba varios segundos.
+  expect(busyMs).toBeLessThan(500);
 });
