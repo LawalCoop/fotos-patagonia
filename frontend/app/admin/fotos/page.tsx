@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { Search, Plus, Loader2, ArrowUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,13 @@ import { cn } from "@/lib/utils";
 import { DeleteConfirmationModal } from "@/components/molecules/delete-confirmation-modal";
 import { AdminPhotoCard } from "@/components/molecules/admin-photo-card"; // <- Importación correcta
 import type { UploadingPhoto } from "@/lib/types";
-import { AlertCircle } from "lucide-react";
+import { UploadProgressPanel } from "@/components/molecules/upload-progress-panel";
+import {
+  applyUploadProgress,
+  isAtTop,
+  prependUnique,
+  resolveUploads,
+} from "@/lib/upload-queue";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 export default function FotosPage() {
@@ -41,6 +47,11 @@ export default function FotosPage() {
   const [deleteTargetIds, setDeleteTargetIds] = useState<number[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState<UploadingPhoto[]>([]);
+  // Total de fotos de la subida en curso (para "Subiendo X de Y").
+  const [uploadTotal, setUploadTotal] = useState(0);
+  // Fotos nuevas que llegaron mientras el usuario miraba más abajo: esperan acá
+  // en vez de insertarse arriba y correr la grilla.
+  const [pendingPhotos, setPendingPhotos] = useState<BackendPhoto[]>([]);
   const [newPhotos, setNewPhotos] = useState<BackendPhoto[]>([]);
   const [oldPhotos, setOldPhotos] = useState<BackendPhoto[]>([]);
   const [offset, setOffset] = useState(0);
@@ -282,10 +293,12 @@ export default function FotosPage() {
   // Polling cada ~7s (solo con pestaña visible): trae la primera página y agrega
   // las fotos con id no visto, para reflejar cargas hechas desde otra sesión.
   const photosSnapshotRef = useRef({ newPhotos, oldPhotos });
+  const addIncomingRef = useRef<(photos: BackendPhoto[]) => void>(() => {});
   const fetchPageRef = useRef(fetchPhotosPage);
   useEffect(() => {
     photosSnapshotRef.current = { newPhotos, oldPhotos };
     fetchPageRef.current = fetchPhotosPage;
+    addIncomingRef.current = addIncomingPhotos;
   });
   useEffect(() => {
     const POLL_MS = 7000;
@@ -298,11 +311,7 @@ export default function FotosPage() {
         const known = new Set([...np.map((p) => p.id), ...op.map((p) => p.id)]);
         const fresh = data.filter((p) => !known.has(p.id));
         if (!fresh.length) return;
-        setNewPhotos((prev) => {
-          const prevIds = new Set(prev.map((p) => p.id));
-          const toAdd = fresh.filter((p) => !prevIds.has(p.id));
-          return toAdd.length ? [...toAdd, ...prev] : prev;
-        });
+        addIncomingRef.current(fresh);
       } catch {
         /* refresco de fondo: ignorar errores transitorios */
       }
@@ -332,20 +341,55 @@ export default function FotosPage() {
   loadingMore,
   handleLoadMore,
 ]);
+  // Fotos nuevas (de una subida o del polling): si la grilla está arriba de
+  // todo se insertan; si el usuario scrolleó, quedan en espera con un aviso.
+  const addIncomingPhotos = (photos: BackendPhoto[]) => {
+    if (!photos.length) return;
+    const ids = new Set(photos.map((p) => p.id));
+    setOldPhotos((prev) => prev.filter((photo) => !ids.has(photo.id)));
+    if (isAtTop(scrollRef.current?.scrollTop)) {
+      setNewPhotos((prev) => prependUnique(prev, photos));
+    } else {
+      setPendingPhotos((prev) => prependUnique(prev, photos));
+    }
+  };
+
+  const flushPendingPhotos = useCallback(() => {
+    setPendingPhotos((pending) => {
+      if (pending.length) setNewPhotos((prev) => prependUnique(prev, pending));
+      return [];
+    });
+  }, []);
+
+  const showPendingPhotos = () => {
+    flushPendingPhotos();
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  // Al volver arriba de todo, se incorporan las fotos que estaban en espera.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (isAtTop(el.scrollTop)) flushPendingPhotos();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [filteredPhotos.length > 0, flushPendingPhotos]);
+
+  // Terminada la subida (sin placeholders), se reinicia el contador.
+  useEffect(() => {
+    if (uploadingPhotos.length === 0) setUploadTotal(0);
+  }, [uploadingPhotos.length]);
+
   const handleUploadStart = (items: UploadingPhoto[]) => {
     if (!items.length) return;
+    setUploadTotal((prev) => prev + items.length);
     setUploadingPhotos((prev) => [...items, ...prev]);
   };
 
   const handleUploadProgress = (tempIds: string[], progress: number) => {
-    if (!tempIds.length) return;
-    setUploadingPhotos((prev) =>
-      prev.map((photo) =>
-        tempIds.includes(photo.tempId)
-          ? { ...photo, progress, status: photo.status === "error" ? "error" : "uploading" }
-          : photo
-      )
-    );
+    setUploadingPhotos((prev) => applyUploadProgress(prev, tempIds, progress));
   };
 
   const handleUploadComplete = (result: {
@@ -353,45 +397,17 @@ export default function FotosPage() {
     failed: string[];
     createdPhotos?: BackendPhoto[];
   }) => {
-    const successSet = new Set(result.success);
-    const failedSet = new Set(result.failed);
     setUploadingPhotos((prev) =>
-      prev
-        .filter((photo) => !successSet.has(photo.tempId))
-        .map((photo) =>
-          failedSet.has(photo.tempId)
-            ? { ...photo, status: "error", progress: undefined }
-            : photo
-        )
+      resolveUploads(prev, result.success, result.failed)
     );
-    const created = result.createdPhotos ?? [];
-    if (created.length > 0) {
-      const createdIds = new Set(created.map((p) => p.id));
-      setNewPhotos((prev) => {
-        const existingIds = new Set(prev.map((p) => p.id));
-        const unique = created.filter((p) => !existingIds.has(p.id));
-        return [...unique, ...prev];
-      });
-      setOldPhotos((prev) =>
-        prev.filter((photo) => !createdIds.has(photo.id))
-      );
-    }
+    addIncomingPhotos(result.createdPhotos ?? []);
   };
 
   const handleUploadError = (tempIds: string[]) => {
     if (!tempIds.length) return;
-    setUploadingPhotos((prev) =>
-      prev.map((photo) =>
-        tempIds.includes(photo.tempId)
-          ? { ...photo, status: "error", progress: undefined }
-          : photo
-      )
-    );
+    setUploadingPhotos((prev) => resolveUploads(prev, [], tempIds));
   };
 
-  
-  
-  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex items-center justify-between">
@@ -459,51 +475,21 @@ export default function FotosPage() {
       {/* Photos Grid */}
       {!loading && (
         <>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {uploadingPhotos.map((photo) => {
-              const isError = photo.status === "error";
-              return (
-                <div
-                  key={photo.tempId}
-                  className={cn(
-                    "relative overflow-hidden rounded-2xl border-2 bg-muted",
-                    isError ? "border-destructive" : "border-primary/40"
-                  )}
-                >
-                  <div className="relative aspect-square overflow-hidden">
-                    <img
-                      src={photo.previewUrl || "/placeholder.svg"}
-                      alt="Subiendo foto"
-                      className={cn(
-                        "h-full w-full object-cover transition-opacity",
-                        isError ? "opacity-60" : "opacity-80"
-                      )}
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40 text-white">
-                      {isError ? (
-                        <AlertCircle className="h-6 w-6 text-destructive" />
-                      ) : (
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      )}
-                      <span className="text-sm font-semibold">
-                        {isError ? "Error al subir" : "Subiendo..."}
-                      </span>
-                      {photo.progress !== undefined && !isError && (
-                        <span className="text-xs text-white/80">
-                          {Math.round(photo.progress)}%
-                        </span>
-                      )}
-                      {isError && (
-                        <span className="text-xs text-white/80">
-                          Podés reintentar desde el modal
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <UploadProgressPanel items={uploadingPhotos} total={uploadTotal} />
+
+          {pendingPhotos.length > 0 && (
+            <div className="sticky top-4 z-20 mb-4 flex justify-center">
+              <Button
+                onClick={showPendingPhotos}
+                className="rounded-full bg-primary font-semibold text-foreground shadow-lg hover:bg-primary-hover"
+              >
+                <ArrowUp className="mr-2 h-4 w-4" />
+                {pendingPhotos.length === 1
+                  ? "1 foto nueva"
+                  : `${pendingPhotos.length} fotos nuevas`}
+              </Button>
+            </div>
+          )}
 
           {filteredPhotos.length > 0 ? (
             <div
