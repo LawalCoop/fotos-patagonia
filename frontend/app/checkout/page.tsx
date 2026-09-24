@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -156,8 +156,12 @@ export default function CheckoutPage() {
   >();
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Al confirmar una orden local se vacía el carrito: sin esta marca, el efecto
+  // de abajo redirigía a /carrito y le ganaba a la redirección a la confirmación.
+  const orderPlacedRef = useRef(false);
 
   useEffect(() => {
+    if (orderPlacedRef.current) return;
     if (items.length === 0) {
       router.push("/carrito");
     }
@@ -338,6 +342,7 @@ export default function CheckoutPage() {
       }
 
       // Canal local: limpiar carrito y redirigir a página de éxito/confirmación
+      orderPlacedRef.current = true;
       clearCart();
       router.push(
         `/checkout/success?orderId=${encodeURIComponent(
