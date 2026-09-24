@@ -46,6 +46,7 @@ services:
   db:
     image: postgres:13
     container_name: fotopatagonia-db
+    restart: unless-stopped
     env_file:
       - ./backend/.env
     volumes:
